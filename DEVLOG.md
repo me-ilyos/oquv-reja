@@ -25,3 +25,9 @@
 **Date:** 2026-06-01
 
 ---
+
+**Task:** Extract total hours, credits, classroom hours, and subcategory hours per course  
+**Solution:** Extended `detect_course_columns` (main.py) to locate five additional columns beyond course name/code: total hours (`soat`), total classroom hours (`auditoriya`), and the five classroom subcategories — Lecture (`Ma'ruza`), Practice (`Amaliy`), Lab (`Laboratoriya`), Seminar, and Course Project (`Kurs ishi`). Total hours and classroom are found by scanning header rows up to the `1.00` row for keyword matches using `_scan_col`. Credits are derived by dividing total hours by 30 at parse time. Subcategory columns are found by reading the label row immediately below the `auditoriya` header row and scanning only columns to the right of `classroom_col`; string values are normalised (all non-alpha characters stripped) before matching, which handles encoding variants (`Ma'ruza` in `mmt_23.xlsx`) and a typo (`Labaratoriya` in `60110100_ppd.xlsx`). This label-row approach was chosen over column-number scanning (values 5–10 in an adjacent header row) because the subcategory order is not consistent across files — `mmt_23.xlsx` places Seminar at position 8 and Lab at position 9, the reverse of other files. `parse_core_courses` now emits `hours`, `credits`, `classroom`, `lecture`, `practice`, `lab`, `seminar`, `course_proj` per course dict; `_int_val` helper handles `None` → `"0"` conversion with graceful fallback. `build_markdown` adds all fields as additional columns in the core courses table.  
+**Date:** 2026-06-01
+
+---
