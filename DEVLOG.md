@@ -19,3 +19,9 @@
 **Date:** 2026-06-01
 
 ---
+
+**Task:** Fix `60110100_ppd.xlsx` producing zero core courses  
+**Solution:** Two structural differences in this file caused `parse_core_courses` to silently collect nothing. First, the section markers and course numbers all carry a trailing period (`"1.00."`, `"1.01."`) which the existing equality checks (`num_str == "1.00"`) and the course-number regex (`^\d+\.\d+(\.\d+)?$`) never matched. Fixed by normalising `num_str` with `.rstrip(".")` before every comparison and regex call. Second, the code and name data sat in different columns than the other files (code in col C, name in col F instead of cols B and C), caused by column-spanning merged cells that leave gap `None` entries between real values — the old hardcoded indices `row[1]` / `row[2]` therefore read `None`. Introduced `detect_course_columns(ws)`: it locates the `"1.00"` cell anywhere in the sheet to establish `num_col`, then scans the first real course row after it and picks the first two non-`None` values past `num_col` as `code_col` and `name_col`. Skipping `None` gaps handles merged cells without any explicit merge-aware API. `parse_core_courses` now calls `detect_course_columns` first and uses the returned indices throughout. The "Jami:" stop condition was also widened from checking only the name column to scanning all cells in the row.  
+**Date:** 2026-06-01
+
+---

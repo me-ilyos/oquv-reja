@@ -48,16 +48,58 @@ def extract_start_year(raw: str) -> str:
     return match.group(1) if match else ""
 
 
+def detect_course_columns(ws) -> tuple[int, int, int]:
+    """Return (num_col, code_col, name_col) as 0-based indices."""
+    num_col = 0
+    start_row_num = None
+
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.value is not None and re.match(r"^1\.00\.?$", str(cell.value).strip()):
+                num_col = cell.column - 1
+                start_row_num = cell.row
+                break
+        if start_row_num is not None:
+            break
+
+    if start_row_num is None:
+        return 0, 1, 2
+
+    code_col, name_col = None, None
+    for data_row in ws.iter_rows(min_row=start_row_num + 1, max_row=start_row_num + 10, values_only=True):
+        if not data_row or data_row[num_col] is None:
+            continue
+        if not re.match(r"^\d+\.\d+", str(data_row[num_col]).strip().rstrip(".")):
+            continue
+        found = []
+        for i in range(num_col + 1, len(data_row)):
+            if data_row[i] is not None and len(found) < 2:
+                found.append(i)
+        if len(found) >= 2:
+            code_col, name_col = found[0], found[1]
+        elif len(found) == 1:
+            code_col = name_col = found[0]
+        break
+
+    if code_col is None:
+        code_col = num_col + 1
+    if name_col is None:
+        name_col = num_col + 2
+
+    return num_col, code_col, name_col
+
+
 def parse_core_courses(ws) -> list[dict]:
+    num_col, code_col, name_col = detect_course_columns(ws)
     courses = []
     in_core_section = False
 
     for row in ws.iter_rows(values_only=True):
-        num = row[0] if len(row) > 0 else None
-        code = row[1] if len(row) > 1 else None
-        name = row[2] if len(row) > 2 else None
+        num = row[num_col] if len(row) > num_col else None
+        code = row[code_col] if len(row) > code_col else None
+        name = row[name_col] if len(row) > name_col else None
 
-        num_str = str(num).strip() if num is not None else None
+        num_str = str(num).strip().rstrip(".") if num is not None else None
         name_str = str(name).strip() if name is not None else None
 
         if num_str == "1.00":
@@ -67,10 +109,12 @@ def parse_core_courses(ws) -> list[dict]:
         if num_str == "2.00":
             break
 
-        if name_str == "Jami:":
+        if in_core_section and any(
+            cell is not None and str(cell).strip() == "Jami:" for cell in row
+        ):
             break
 
-        if in_core_section and is_course_number(num) and section_prefix(num) == "1":
+        if in_core_section and is_course_number(num_str) and section_prefix(num_str) == "1":
             courses.append({
                 "num": num_str,
                 "code": str(code).strip() if code else "",
