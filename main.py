@@ -18,17 +18,24 @@ def section_prefix(course_num) -> str:
     return str(course_num).strip().split(".")[0]
 
 
-def find_cell_containing(ws, substring: str) -> str | None:
-    for row in ws.iter_rows(max_row=15, values_only=True):
+def find_cell_containing(ws, substring: str):
+    for row in ws.iter_rows(max_row=15):
         for cell in row:
-            if isinstance(cell, str) and substring in cell:
+            if isinstance(cell.value, str) and substring in cell.value:
                 return cell
     return None
 
 
+def parse_label_value(raw: str) -> str:
+    parts = raw.split(" - ", 1)
+    return parts[1].strip() if len(parts) > 1 else raw.strip()
+
+
 def extract_direction(raw: str) -> tuple[str, str]:
-    code = re.search(r"\d{6,9}", raw).group()
-    name = raw.split(" - ", 1)[1].strip()
+    match = re.search(r"\d{6,9}", raw)
+    code = match.group() if match else ""
+    parts = raw.split(" - ", 1)
+    name = parts[1].strip() if len(parts) > 1 else raw.strip()
     return code, name
 
 
@@ -73,8 +80,23 @@ def parse_core_courses(ws) -> list[dict]:
     return courses
 
 
-def build_markdown(title: str, start_year: str, core_courses: list[dict]) -> str:
+def build_markdown(
+    title: str,
+    start_year: str,
+    degree: str,
+    duration: str,
+    edu_type: str,
+    core_courses: list[dict],
+) -> str:
     lines = [f"# Oquv Reja: {title}", ""]
+    if degree:
+        lines.append(f"**Akademik daraja:** {degree}")
+    if duration:
+        lines.append(f"**O'qish muddati:** {duration}")
+    if edu_type:
+        lines.append(f"**Ta'lim shakli:** {edu_type}")
+    if degree or duration or edu_type:
+        lines.append("")
     lines.append("## Majburiy Fanlar (Core Courses)")
     lines.append("")
     lines.append("| # | Code | Name |")
@@ -93,18 +115,34 @@ def process_file(xlsx_path: Path) -> None:
     wb = openpyxl.load_workbook(xlsx_path, data_only=True)
     ws = wb.active
 
-    direction_raw = find_cell_containing(ws, "nalishi:")
-    year_raw = find_cell_containing(ws, "quv yili")
+    direction_cell = find_cell_containing(ws, "nalishi:")
+    year_cell = find_cell_containing(ws, "quv yili")
 
-    if direction_raw:
+    if direction_cell:
+        direction_raw = direction_cell.value or ""
+        if not re.search(r"\d{6,9}", direction_raw):
+            below = ws.cell(row=direction_cell.row + 1, column=direction_cell.column)
+            if below.value:
+                direction_raw = direction_raw + " " + str(below.value)
         code, name = extract_direction(direction_raw)
-        stem = f"{to_camel_case(name)}_{code}"
+        if not code:
+            print(f"  WARNING: no direction code found in: {direction_raw!r}")
+        stem = f"{to_camel_case(name)}_{code}" if code else to_camel_case(name)
         title = name
     else:
         stem = xlsx_path.stem
         title = xlsx_path.stem
 
+    year_raw = year_cell.value if year_cell else None
     start_year = extract_start_year(year_raw) if year_raw else ""
+
+    degree_cell   = find_cell_containing(ws, "Akademik daraja")
+    duration_cell = find_cell_containing(ws, "muddati")
+    edu_type_cell = find_cell_containing(ws, "shakli")
+
+    degree   = parse_label_value(degree_cell.value)   if degree_cell   else ""
+    duration = parse_label_value(duration_cell.value) if duration_cell else ""
+    edu_type = parse_label_value(edu_type_cell.value) if edu_type_cell else ""
 
     core_courses = parse_core_courses(ws)
 
@@ -112,7 +150,10 @@ def process_file(xlsx_path: Path) -> None:
     if start_year:
         stem = f"{stem}_{start_year}"
     out_path = OUTPUT_DIR / (stem + ".md")
-    out_path.write_text(build_markdown(title, start_year, core_courses), encoding="utf-8")
+    out_path.write_text(
+        build_markdown(title, start_year, degree, duration, edu_type, core_courses),
+        encoding="utf-8",
+    )
     print(f"  {xlsx_path.name} -> {out_path}  ({len(core_courses)} core courses)")
 
 
