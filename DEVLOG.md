@@ -2,6 +2,12 @@
 
 ---
 
+**Task:** Document project purpose, users, and domain terminology in CLAUDE.md  
+**Solution:** Added two new sections to `CLAUDE.md`. **Project Overview** explains why the project exists (automate department hour calculation and professor workload distribution), who uses it (department heads via a future UI), when it runs (on demand), and where output goes (hour-load tables, course document templates, future database). **Glossary** defines key Uzbek domain terms: *oquv reja*, course categories (majburiy fanlar / tanlov fanlar), the classroom vs. individual hours split with all subcategory names (maruza, amaliy, seminar, kurs ishi, mustaqil ta'lim), the 1-credit = 30-hour rule, the fixed 15-week semester, and program metadata fields. Also removed the *Excel structure assumptions*, *Key functions*, and *Known edge cases* subsections from `CLAUDE.md` as they are derivable from the code itself.  
+**Date:** 2026-06-03
+
+---
+
 **Task:** Fix crash when direction code regex finds no match in a cell  
 **Solution:** `extract_direction` (main.py) called `.group()` directly on the result of `re.search`, which crashed with `AttributeError` when no 6–9 digit code was present in the cell. Fixed by assigning the match result first and guarding with `if match`. Also hardened the `" - "` name split to fall back to the full raw string when the separator is absent. A warning print was added so files without a parseable code are visible at runtime.  
 **Date:** 2026-06-01
