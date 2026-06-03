@@ -53,20 +53,24 @@ Parses Uzbek university curriculum plans (*oquv reja*) issued in Excel by the Mi
 ## Commands
 
 ```bash
-# Run the parser
+# Parse all files in sources/
 python main.py
+
+# Parse specific file(s)
+python main.py sources/mmt_23.xlsx
+python main.py sources/mmt_23.xlsx sources/60110100_ppd.xlsx
 
 # Install dependencies
 pip install -r requirements.txt
 
 # Format code
-ruff format main.py
+ruff format main.py parser.py formatter.py
 
 # Lint (check only)
-ruff check main.py
+ruff check main.py parser.py formatter.py
 
 # Lint (auto-fix)
-ruff check --fix main.py
+ruff check --fix main.py parser.py formatter.py
 ```
 
 No test suite is configured yet. When adding tests, use **pytest**.
@@ -95,19 +99,25 @@ Rules enabled: pycodestyle errors and warnings (`E`, `W`), Pyflakes (`F`), impor
 
 ## Architecture
 
-Single-file ETL script (`main.py`) that reads Uzbek academic plan spreadsheets from `sources/*.xlsx` and writes one Markdown file per spreadsheet to `output/`.
+Three-module ETL package that reads Uzbek academic plan spreadsheets from `sources/*.xlsx` and writes one Markdown file per spreadsheet to `output/`.
+
+| Module | Role |
+|---|---|
+| `parser.py` | All Excel-reading logic: metadata extraction, column detection, course parsing |
+| `formatter.py` | Renders parsed data to Markdown (`build_markdown`) |
+| `main.py` | Entry point: CLI argument handling, file I/O, orchestrates parser + formatter |
 
 ### Data flow
 
 ```
-sources/*.xlsx  →  main.py  →  output/*.md
+sources/*.xlsx  →  main.py → parser.py  →  formatter.py  →  output/*.md
 ```
 
 Each output filename is built from the extracted program name (CamelCase) + direction code + start year, e.g. `MaktabgachaTalim_60110200_2023.md`.
 
 ### Processing stages
 
-`main.py` runs four stages per file. Read the code for function-level details — document here only what isn't obvious from reading it.
+`main.py` orchestrates four stages per file via `parser.py` and `formatter.py`. Read the code for function-level details — document here only what isn't obvious from reading it.
 
 1. **Metadata extraction** — keyword-searches the first 15 rows for program info (direction, year, degree, duration, study format). Uses cell position, not fixed coordinates.
 2. **Column detection** — dynamically locates all column indices by anchoring on the `"1.00"` marker cell and scanning header rows for keywords (see Excel Input Format for why this can't be hardcoded).

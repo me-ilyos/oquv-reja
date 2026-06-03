@@ -2,6 +2,12 @@
 
 ---
 
+**Task:** Add CLI argument support for parsing specific files and update CLAUDE.md architecture docs
+**Solution:** Added `argparse` to `main()` in `main.py` — accepts zero or more positional `files` arguments; when none are given it falls back to globbing `sources/*.xlsx` (existing behaviour). Missing files emit a `WARNING:` rather than crashing. Updated `CLAUDE.md` Commands section to show the specific-file invocation forms, and updated the Architecture section to reflect the three-module structure (`parser.py`, `formatter.py`, `main.py`) that replaced the original single-file description.
+**Date:** 2026-06-03
+
+---
+
 **Task:** Repo cleanup — gitignore, untrack sources, reorganize docs into .claude/
 **Solution:** Added `sources/`, `__pycache__/`, and `.ruff_cache/` to `.gitignore`; ran `git rm --cached` to stop tracking the six source `.xlsx` files (kept locally). Moved `CLAUDE.md` and `DEVLOG.md` from the project root into `.claude/` using `git mv` so the root stays clean. Updated path references to `DEVLOG.md` in `.claude/CLAUDE.md` and `.claude/skills/ship/SKILL.md`. Deleted `inspect_columns.py` and `inspect_detailed.py` — one-off debug scripts no longer needed now that column detection is stable.
 **Date:** 2026-06-03

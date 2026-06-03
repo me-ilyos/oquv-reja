@@ -1,3 +1,4 @@
+import argparse
 import re
 from pathlib import Path
 
@@ -64,11 +65,29 @@ def process_file(xlsx_path: Path) -> None:
 
 
 def main() -> None:
-    xlsx_files = sorted(
-        f for f in SOURCES_DIR.glob("*.xlsx") if not f.name.startswith("~$")
+    arg_parser = argparse.ArgumentParser(description="Parse oquv reja Excel files.")
+    arg_parser.add_argument(
+        "files",
+        nargs="*",
+        type=Path,
+        help="One or more .xlsx files to parse. Defaults to all files in sources/.",
     )
+    args = arg_parser.parse_args()
+
+    if args.files:
+        xlsx_files = []
+        for p in args.files:
+            if not p.exists():
+                print(f"WARNING: file not found: {p}")
+            else:
+                xlsx_files.append(p)
+    else:
+        xlsx_files = sorted(
+            f for f in SOURCES_DIR.glob("*.xlsx") if not f.name.startswith("~$")
+        )
+
     if not xlsx_files:
-        print("No .xlsx files found in sources/")
+        print("No .xlsx files found.")
         return
     for xlsx_path in xlsx_files:
         process_file(xlsx_path)
