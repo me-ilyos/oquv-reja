@@ -2,6 +2,24 @@
 
 ---
 
+**Task:** Repo cleanup — gitignore, untrack sources, reorganize docs into .claude/
+**Solution:** Added `sources/`, `__pycache__/`, and `.ruff_cache/` to `.gitignore`; ran `git rm --cached` to stop tracking the six source `.xlsx` files (kept locally). Moved `CLAUDE.md` and `DEVLOG.md` from the project root into `.claude/` using `git mv` so the root stays clean. Updated path references to `DEVLOG.md` in `.claude/CLAUDE.md` and `.claude/skills/ship/SKILL.md`. Deleted `inspect_columns.py` and `inspect_detailed.py` — one-off debug scripts no longer needed now that column detection is stable.
+**Date:** 2026-06-03
+
+---
+
+**Task:** Refactor main.py into parser.py, formatter.py, and a slim orchestration entry point
+**Solution:** Split the 346-line `main.py` into three focused modules. `parser.py` contains all parsing and extraction logic: string helpers (`is_course_number`, `section_prefix`, `parse_label_value`, `extract_direction`, `to_camel_case`, `extract_start_year`), worksheet helpers (`find_cell_containing`, `_scan_col`, `_int_val`), and the two main parsing functions (`detect_course_columns`, `parse_core_courses`). `formatter.py` contains `build_markdown`. `main.py` is reduced to ~65 lines covering only `process_file` and `main`. No function signatures, logic, or output changed — verified by running against all six source files and confirming identical course counts.
+**Date:** 2026-06-03
+
+---
+
+**Task:** Create /ship custom skill for the log → commit → push workflow
+**Solution:** Created `.claude/skills/ship/SKILL.md` — a project-level Claude Code skill that automates the post-task workflow: infer the task and solution from conversation context, append a DEVLOG entry at the top of `.claude/DEVLOG.md`, stage and commit all changed files, and push to `main`. Chosen as a skill (over a slash command) for the richer frontmatter and auto-invocation support.
+**Date:** 2026-06-03
+
+---
+
 **Task:** Expand CLAUDE.md with full project documentation and set up ruff formatter  
 **Solution:** `CLAUDE.md` was significantly expanded beyond the original architecture stub. Added: Tech Stack section, Processing Stages breakdown (4 stages per file), "What is NOT implemented yet" list (selective courses, semester splitting, individual hours, workload distribution, DB output), Excel Input Format section covering all three sheet regions (metadata, course data, header rows), Known Edge Cases table derived from DEVLOG, Coding Conventions, Rules for Generating Code, Output Format sample, and Future Direction guidance. Also added `Laboratoriya` (lab work) to the Glossary hour-structure table which was previously missing. Set up `ruff` (v0.15.15) as the project formatter/linter: added `pyproject.toml` with `line-length = 88` and rules `E, F, W, I`; ran `ruff format main.py` which reformatted long lines and removed manual alignment padding — no logic changes. Added ruff to `requirements.txt`.  
 **Date:** 2026-06-03

@@ -174,7 +174,7 @@ Inferred from the existing codebase — follow these when modifying or extending
 
 ## Rules for Generating Code
 
-These are derived from every bug in `DEVLOG.md`. Follow them or you will reintroduce solved problems.
+These are derived from every bug in `.claude/DEVLOG.md`. Follow them or you will reintroduce solved problems.
 
 ### General discipline
 Applies to any change, not just this project. Listed because these are the failure modes that matter, not generic style advice:
@@ -234,7 +234,7 @@ The end goal is a department management tool, not a standalone script. Keep this
 
 ## Dev Log
 
-Task history is tracked in `DEVLOG.md`. Format for new entries:
+Task history is tracked in `.claude/DEVLOG.md`. Format for new entries:
 
 ```
 ---
