@@ -57,7 +57,9 @@ def _scan_col(ws, keyword: str, max_row: int):
     return None
 
 
-def detect_course_columns(ws) -> tuple[int, int, int, int, int, int, int, int, int, int]:
+def detect_course_columns(
+    ws,
+) -> tuple[int, int, int, int, int, int, int, int, int, int]:
     """Return (num_col, code_col, name_col, hours_col, classroom_col,
     lecture_col, practice_col, lab_col, seminar_col, course_proj_col) as 0-based indices."""
     num_col = 0
@@ -65,7 +67,9 @@ def detect_course_columns(ws) -> tuple[int, int, int, int, int, int, int, int, i
 
     for row in ws.iter_rows():
         for cell in row:
-            if cell.value is not None and re.match(r"^1\.00\.?$", str(cell.value).strip()):
+            if cell.value is not None and re.match(
+                r"^1\.00\.?$", str(cell.value).strip()
+            ):
                 num_col = cell.column - 1
                 start_row_num = cell.row
                 break
@@ -76,7 +80,9 @@ def detect_course_columns(ws) -> tuple[int, int, int, int, int, int, int, int, i
         return 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 
     code_col, name_col = None, None
-    for data_row in ws.iter_rows(min_row=start_row_num + 1, max_row=start_row_num + 10, values_only=True):
+    for data_row in ws.iter_rows(
+        min_row=start_row_num + 1, max_row=start_row_num + 10, values_only=True
+    ):
         if not data_row or data_row[num_col] is None:
             continue
         if not re.match(r"^\d+\.\d+", str(data_row[num_col]).strip().rstrip(".")):
@@ -96,7 +102,7 @@ def detect_course_columns(ws) -> tuple[int, int, int, int, int, int, int, int, i
     if name_col is None:
         name_col = num_col + 2
 
-    hours_col     = _scan_col(ws, "soat", start_row_num) or (name_col + 1)
+    hours_col = _scan_col(ws, "soat", start_row_num) or (name_col + 1)
 
     # Find classroom_col and capture which row it was on so we can read the label row below it.
     classroom_col = None
@@ -118,7 +124,9 @@ def detect_course_columns(ws) -> tuple[int, int, int, int, int, int, int, int, i
     lecture_col = practice_col = lab_col = seminar_col = course_proj_col = None
     if auditoriya_row is not None:
         label_row = next(
-            ws.iter_rows(min_row=auditoriya_row + 1, max_row=auditoriya_row + 1, values_only=True)
+            ws.iter_rows(
+                min_row=auditoriya_row + 1, max_row=auditoriya_row + 1, values_only=True
+            )
         )
         for i, v in enumerate(label_row):
             if i <= classroom_col or not isinstance(v, str):
@@ -135,14 +143,24 @@ def detect_course_columns(ws) -> tuple[int, int, int, int, int, int, int, int, i
             elif "kursish" in norm and course_proj_col is None:
                 course_proj_col = i
 
-    lecture_col     = lecture_col     or classroom_col + 1
-    practice_col    = practice_col    or classroom_col + 2
-    lab_col         = lab_col         or classroom_col + 3
-    seminar_col     = seminar_col     or classroom_col + 4
+    lecture_col = lecture_col or classroom_col + 1
+    practice_col = practice_col or classroom_col + 2
+    lab_col = lab_col or classroom_col + 3
+    seminar_col = seminar_col or classroom_col + 4
     course_proj_col = course_proj_col or classroom_col + 5
 
-    return (num_col, code_col, name_col, hours_col, classroom_col,
-            lecture_col, practice_col, lab_col, seminar_col, course_proj_col)
+    return (
+        num_col,
+        code_col,
+        name_col,
+        hours_col,
+        classroom_col,
+        lecture_col,
+        practice_col,
+        lab_col,
+        seminar_col,
+        course_proj_col,
+    )
 
 
 def _int_val(row, col, default="0") -> str:
@@ -156,8 +174,18 @@ def _int_val(row, col, default="0") -> str:
 
 
 def parse_core_courses(ws) -> list[dict]:
-    (num_col, code_col, name_col, hours_col, classroom_col,
-     lecture_col, practice_col, lab_col, seminar_col, course_proj_col) = detect_course_columns(ws)
+    (
+        num_col,
+        code_col,
+        name_col,
+        hours_col,
+        classroom_col,
+        lecture_col,
+        practice_col,
+        lab_col,
+        seminar_col,
+        course_proj_col,
+    ) = detect_course_columns(ws)
     courses = []
     in_core_section = False
 
@@ -182,28 +210,36 @@ def parse_core_courses(ws) -> list[dict]:
         ):
             break
 
-        if in_core_section and is_course_number(num_str) and section_prefix(num_str) == "1":
+        if (
+            in_core_section
+            and is_course_number(num_str)
+            and section_prefix(num_str) == "1"
+        ):
             try:
                 hours_str = str(int(float(hours_raw))) if hours_raw is not None else ""
             except (ValueError, TypeError):
                 hours_str = str(hours_raw).strip() if hours_raw is not None else ""
             try:
-                credits = str(int(float(hours_raw) / 30)) if hours_raw is not None else ""
+                credits = (
+                    str(int(float(hours_raw) / 30)) if hours_raw is not None else ""
+                )
             except (ValueError, TypeError):
                 credits = ""
-            courses.append({
-                "num": num_str,
-                "code": str(code).strip() if code else "",
-                "name": name_str or "",
-                "hours": hours_str,
-                "credits": credits,
-                "classroom": _int_val(row, classroom_col),
-                "lecture": _int_val(row, lecture_col),
-                "practice": _int_val(row, practice_col),
-                "lab": _int_val(row, lab_col),
-                "seminar": _int_val(row, seminar_col),
-                "course_proj": _int_val(row, course_proj_col),
-            })
+            courses.append(
+                {
+                    "num": num_str,
+                    "code": str(code).strip() if code else "",
+                    "name": name_str or "",
+                    "hours": hours_str,
+                    "credits": credits,
+                    "classroom": _int_val(row, classroom_col),
+                    "lecture": _int_val(row, lecture_col),
+                    "practice": _int_val(row, practice_col),
+                    "lab": _int_val(row, lab_col),
+                    "seminar": _int_val(row, seminar_col),
+                    "course_proj": _int_val(row, course_proj_col),
+                }
+            )
 
     return courses
 
@@ -227,8 +263,12 @@ def build_markdown(
         lines.append("")
     lines.append("## Majburiy Fanlar (Core Courses)")
     lines.append("")
-    lines.append("| # | Code | Name | Hours | Credits | Classroom | Lecture | Practice | Lab | Seminar | Course Proj |")
-    lines.append("|---|------|------|-------|---------|-----------|---------|----------|-----|---------|-------------|")
+    lines.append(
+        "| # | Code | Name | Hours | Credits | Classroom | Lecture | Practice | Lab | Seminar | Course Proj |"
+    )
+    lines.append(
+        "|---|------|------|-------|---------|-----------|---------|----------|-----|---------|-------------|"
+    )
     for course in core_courses:
         lines.append(
             f"| {course['num']} | {course['code']} | {course['name']} "
@@ -269,11 +309,11 @@ def process_file(xlsx_path: Path) -> None:
     year_raw = year_cell.value if year_cell else None
     start_year = extract_start_year(year_raw) if year_raw else ""
 
-    degree_cell   = find_cell_containing(ws, "Akademik daraja")
+    degree_cell = find_cell_containing(ws, "Akademik daraja")
     duration_cell = find_cell_containing(ws, "muddati")
     edu_type_cell = find_cell_containing(ws, "shakli")
 
-    degree   = parse_label_value(degree_cell.value)   if degree_cell   else ""
+    degree = parse_label_value(degree_cell.value) if degree_cell else ""
     duration = parse_label_value(duration_cell.value) if duration_cell else ""
     edu_type = parse_label_value(edu_type_cell.value) if edu_type_cell else ""
 
@@ -291,7 +331,9 @@ def process_file(xlsx_path: Path) -> None:
 
 
 def main() -> None:
-    xlsx_files = sorted(f for f in SOURCES_DIR.glob("*.xlsx") if not f.name.startswith("~$"))
+    xlsx_files = sorted(
+        f for f in SOURCES_DIR.glob("*.xlsx") if not f.name.startswith("~$")
+    )
     if not xlsx_files:
         print("No .xlsx files found in sources/")
         return

@@ -2,6 +2,12 @@
 
 ---
 
+**Task:** Expand CLAUDE.md with full project documentation and set up ruff formatter  
+**Solution:** `CLAUDE.md` was significantly expanded beyond the original architecture stub. Added: Tech Stack section, Processing Stages breakdown (4 stages per file), "What is NOT implemented yet" list (selective courses, semester splitting, individual hours, workload distribution, DB output), Excel Input Format section covering all three sheet regions (metadata, course data, header rows), Known Edge Cases table derived from DEVLOG, Coding Conventions, Rules for Generating Code, Output Format sample, and Future Direction guidance. Also added `Laboratoriya` (lab work) to the Glossary hour-structure table which was previously missing. Set up `ruff` (v0.15.15) as the project formatter/linter: added `pyproject.toml` with `line-length = 88` and rules `E, F, W, I`; ran `ruff format main.py` which reformatted long lines and removed manual alignment padding — no logic changes. Added ruff to `requirements.txt`.  
+**Date:** 2026-06-03
+
+---
+
 **Task:** Document project purpose, users, and domain terminology in CLAUDE.md  
 **Solution:** Added two new sections to `CLAUDE.md`. **Project Overview** explains why the project exists (automate department hour calculation and professor workload distribution), who uses it (department heads via a future UI), when it runs (on demand), and where output goes (hour-load tables, course document templates, future database). **Glossary** defines key Uzbek domain terms: *oquv reja*, course categories (majburiy fanlar / tanlov fanlar), the classroom vs. individual hours split with all subcategory names (maruza, amaliy, seminar, kurs ishi, mustaqil ta'lim), the 1-credit = 30-hour rule, the fixed 15-week semester, and program metadata fields. Also removed the *Excel structure assumptions*, *Key functions*, and *Known edge cases* subsections from `CLAUDE.md` as they are derivable from the code itself.  
 **Date:** 2026-06-03
