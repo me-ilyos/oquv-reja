@@ -52,11 +52,84 @@ def _scan_col(ws, keyword: str, max_row: int):
     return None
 
 
+def _extract_program_years(ws) -> int:
+    """Return program duration in years (e.g. 3 for '3 yil'). Defaults to 4."""
+    cell = find_cell_containing(ws, "muddati")
+    if cell is None:
+        return 4
+    match = re.search(r"(\d+)\s*yil", str(cell.value or ""))
+    return int(match.group(1)) if match else 4
+
+
+def detect_semester_columns(ws) -> dict[int, int]:
+    """Return {0-based col index: semester number (1-8)} for semester columns.
+
+    Identifies the semester header row by finding a row with unique, consecutive
+    integers in [12, 19] (12→S1, ..., 19→S8). Prints WARNING: and returns {} if
+    no such row is found.
+    """
+    start_row_num = None
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.value is not None and re.match(
+                r"^1\.00\.?$", str(cell.value).strip()
+            ):
+                start_row_num = cell.row
+                break
+        if start_row_num is not None:
+            break
+
+    if start_row_num is None:
+        print("WARNING: semester header row not found (1.00 anchor missing)")
+        return {}
+
+    # Scan the window closest to start_row_num; the semester row is typically
+    # 1-2 rows above 1.00. Scanning bottom-up avoids false-positive earlier rows.
+    scan_start = max(1, start_row_num - 10)
+    last_match = None
+    for row in ws.iter_rows(
+        min_row=scan_start, max_row=start_row_num, values_only=True
+    ):
+        candidates = []
+        for col_idx, cell_val in enumerate(row):
+            if cell_val is None:
+                continue
+            try:
+                int_val = int(float(cell_val))
+            except (ValueError, TypeError):
+                continue
+            if 12 <= int_val <= 19:
+                candidates.append((col_idx, int_val))
+
+        if len(candidates) < 3:
+            continue
+        values = [v for _, v in candidates]
+        if len(values) != len(set(values)):
+            continue
+        candidates.sort(key=lambda x: x[1])
+        is_consecutive = all(
+            candidates[i + 1][1] == candidates[i][1] + 1
+            for i in range(len(candidates) - 1)
+        )
+        if not is_consecutive:
+            continue
+
+        last_match = {col_idx: int_val - 11 for col_idx, int_val in candidates}
+
+    if last_match is not None:
+        max_semesters = _extract_program_years(ws) * 2
+        return {col: sem for col, sem in last_match.items() if sem <= max_semesters}
+
+    print("WARNING: semester header row not found")
+    return {}
+
+
 def detect_course_columns(
     ws,
 ) -> tuple[int, int, int, int, int, int, int, int, int, int]:
     """Return (num_col, code_col, name_col, hours_col, classroom_col,
-    lecture_col, practice_col, lab_col, seminar_col, course_proj_col) as 0-based indices."""
+    lecture_col, practice_col, lab_col, seminar_col, course_proj_col)
+    as 0-based indices."""
     num_col = 0
     start_row_num = None
 
@@ -99,7 +172,7 @@ def detect_course_columns(
 
     hours_col = _scan_col(ws, "soat", start_row_num) or (name_col + 1)
 
-    # Find classroom_col and capture which row it was on so we can read the label row below it.
+    # Find classroom_col; capture its row to read the label row below it.
     classroom_col = None
     auditoriya_row = None
     for hrow in ws.iter_rows(max_row=start_row_num):
@@ -168,6 +241,24 @@ def _int_val(row, col, default="0") -> str:
         return default
 
 
+def _extract_semester_credits(
+    row: tuple, semester_col_map: dict[int, int]
+) -> dict[int, str]:
+    """Return {semester_number: credit_string} for non-zero semester values."""
+    result = {}
+    for col_idx, sem_num in semester_col_map.items():
+        raw = row[col_idx] if len(row) > col_idx else None
+        if raw is None:
+            continue
+        try:
+            int_val = int(float(raw))
+        except (ValueError, TypeError):
+            continue
+        if int_val != 0:
+            result[sem_num] = str(int_val)
+    return result
+
+
 def parse_core_courses(ws) -> list[dict]:
     (
         num_col,
@@ -181,6 +272,7 @@ def parse_core_courses(ws) -> list[dict]:
         seminar_col,
         course_proj_col,
     ) = detect_course_columns(ws)
+    semester_col_map = detect_semester_columns(ws)
     courses = []
     in_core_section = False
 
@@ -233,6 +325,9 @@ def parse_core_courses(ws) -> list[dict]:
                     "lab": _int_val(row, lab_col),
                     "seminar": _int_val(row, seminar_col),
                     "course_proj": _int_val(row, course_proj_col),
+                    "semester_credits": _extract_semester_credits(
+                        row, semester_col_map
+                    ),
                 }
             )
 

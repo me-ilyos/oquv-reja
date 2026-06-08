@@ -2,6 +2,18 @@
 
 ---
 
+**Task:** Fix semester detection bleeding into "Kredit taqsimoti" section on sub-8-semester programs
+**Solution:** For a 3-year (6-semester) program like `mt_23.xlsx`, the column-numbering row places the "Semestrdagi auditoriya" section at global columns 12–17 and the "Kredit taqsimoti" section at 18+. The previous detector looked for unique consecutive values in [12, 19], so columns 18–19 of the Kredit section were incorrectly captured as semesters 7–8. Fixed by adding `_extract_program_years(ws)` (reuses existing `find_cell_containing(ws, "muddati")`, parses `"N yil"`, defaults to 4) and filtering the detected map to `sem_num <= years * 2` at the end of `detect_semester_columns`.
+**Date:** 2026-06-08
+
+---
+
+**Task:** Extract per-semester classroom hours for each course and render as S1–SN columns
+**Solution:** Added `detect_semester_columns(ws)` to `parser.py`, which locates the column-numbering row (values 12–19 unique and consecutive) in the 10-row window immediately above the `1.00` marker, and returns `{col_idx: semester_num}`. Uses bottom-up scan (`last_match`) to avoid an earlier false-positive metadata row present in some files. Added `_extract_semester_credits(row, map)` to pull non-zero values from semester columns per course row, stored as `semester_credits: dict[int, str]` in each course dict. `build_markdown` in `formatter.py` now computes `active_semesters` from the union of all courses' semester keys and appends S1…SN columns dynamically; if detection fails the table renders unchanged.
+**Date:** 2026-06-08
+
+---
+
 **Task:** Add CLI argument support for parsing specific files and update CLAUDE.md architecture docs
 **Solution:** Added `argparse` to `main()` in `main.py` — accepts zero or more positional `files` arguments; when none are given it falls back to globbing `sources/*.xlsx` (existing behaviour). Missing files emit a `WARNING:` rather than crashing. Updated `CLAUDE.md` Commands section to show the specific-file invocation forms, and updated the Architecture section to reflect the three-module structure (`parser.py`, `formatter.py`, `main.py`) that replaced the original single-file description.
 **Date:** 2026-06-03
