@@ -10,6 +10,7 @@ from parser import (
     extract_start_year,
     find_cell_containing,
     parse_core_courses,
+    parse_selective_courses,
     parse_label_value,
     to_camel_case,
 )
@@ -52,16 +53,22 @@ def process_file(xlsx_path: Path) -> None:
     edu_type = parse_label_value(edu_type_cell.value) if edu_type_cell else ""
 
     core_courses = parse_core_courses(ws)
+    selective_slots = parse_selective_courses(ws)
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     if start_year:
         stem = f"{stem}_{start_year}"
     out_path = OUTPUT_DIR / (stem + ".md")
     out_path.write_text(
-        build_markdown(title, start_year, degree, duration, edu_type, core_courses),
+        build_markdown(
+            title, start_year, degree, duration, edu_type, core_courses, selective_slots
+        ),
         encoding="utf-8",
     )
-    print(f"  {xlsx_path.name} -> {out_path}  ({len(core_courses)} core courses)")
+    print(
+        f"  {xlsx_path.name} -> {out_path}"
+        f"  ({len(core_courses)} core, {len(selective_slots)} selective slots)"
+    )
 
 
 def main() -> None:

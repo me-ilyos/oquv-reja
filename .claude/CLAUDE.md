@@ -126,7 +126,6 @@ Each output filename is built from the extracted program name (CamelCase) + dire
 
 ### What is NOT implemented yet
 
-- **Selective courses (tanlov fanlar)** — section 2 is not parsed. `parse_core_courses` stops at `"2.00"`.
 - **Semester splitting** — per-semester weekly hours exist in the spreadsheet but are not extracted.
 - **Individual hours (mustaqil ta'lim)** — not extracted per course.
 - **Professor workload distribution** — mentioned in project goals but no code exists.
@@ -196,7 +195,7 @@ Applies to any change, not just this project. Listed because these are the failu
 
 ### Scope — do exactly what's asked
 - **Change only what the task requires.** Do not refactor, rename, or "tidy" unrelated code in the same edit. The DEVLOG shows surgical, single-purpose changes — match that.
-- **The "What is NOT implemented yet" list is a boundary, not a backlog.** Do not opportunistically add selective-course parsing, semester splitting, etc. unless explicitly asked. Adding unrequested features is a defect, not a bonus.
+- **The "What is NOT implemented yet" list is a boundary, not a backlog.** Do not opportunistically add semester splitting, professor workload distribution, etc. unless explicitly asked. Adding unrequested features is a defect, not a bonus.
 - **Do not change function return shapes or the output format** without being asked. Other code (and the planned UI) depends on them.
 
 ### Input — never trust a single sample

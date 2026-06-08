@@ -61,12 +61,12 @@ def _extract_program_years(ws) -> int:
     return int(match.group(1)) if match else 4
 
 
-def detect_semester_columns(ws) -> dict[int, int]:
-    """Return {0-based col index: semester number (1-8)} for semester columns.
+def _detect_col_range(ws, lo: int, hi: int, offset: int) -> dict[int, int]:
+    """Scan header rows near the 1.00 anchor for consecutive ints in [lo, hi].
 
-    Identifies the semester header row by finding a row with unique, consecutive
-    integers in [12, 19] (12→S1, ..., 19→S8). Prints WARNING: and returns {} if
-    no such row is found.
+    Returns {0-based col index: int_val - offset} for the last matching row,
+    or {} if no qualifying row is found. Used by detect_semester_columns and
+    detect_weekly_hours_columns.
     """
     start_row_num = None
     for row in ws.iter_rows():
@@ -80,11 +80,8 @@ def detect_semester_columns(ws) -> dict[int, int]:
             break
 
     if start_row_num is None:
-        print("WARNING: semester header row not found (1.00 anchor missing)")
         return {}
 
-    # Scan the window closest to start_row_num; the semester row is typically
-    # 1-2 rows above 1.00. Scanning bottom-up avoids false-positive earlier rows.
     scan_start = max(1, start_row_num - 10)
     last_match = None
     for row in ws.iter_rows(
@@ -98,7 +95,7 @@ def detect_semester_columns(ws) -> dict[int, int]:
                 int_val = int(float(cell_val))
             except (ValueError, TypeError):
                 continue
-            if 12 <= int_val <= 19:
+            if lo <= int_val <= hi:
                 candidates.append((col_idx, int_val))
 
         if len(candidates) < 3:
@@ -114,14 +111,38 @@ def detect_semester_columns(ws) -> dict[int, int]:
         if not is_consecutive:
             continue
 
-        last_match = {col_idx: int_val - 11 for col_idx, int_val in candidates}
+        last_match = {col_idx: int_val - offset for col_idx, int_val in candidates}
 
-    if last_match is not None:
-        max_semesters = _extract_program_years(ws) * 2
-        return {col: sem for col, sem in last_match.items() if sem <= max_semesters}
+    return last_match or {}
 
-    print("WARNING: semester header row not found")
-    return {}
+
+def detect_semester_columns(ws) -> dict[int, int]:
+    """Return {0-based col index: semester number (1-N)} for credit-distribution columns.
+
+    The credit columns are labeled (12+N) to (11+2N) in the header row, where
+    N = total semesters (program_years * 2). For a 4-year program N=8: range [20,27],
+    offset=19. For a 3-year program N=6: range [18,23], offset=17.
+    """
+    n = _extract_program_years(ws) * 2
+    lo, hi, offset = 12 + n, 11 + 2 * n, 11 + n
+    result = _detect_col_range(ws, lo, hi, offset)
+    if not result:
+        print("WARNING: semester (credit) header row not found")
+        return {}
+    return {col: sem for col, sem in result.items() if sem <= n}
+
+
+def detect_weekly_hours_columns(ws) -> dict[int, int]:
+    """Return {0-based col index: semester number (1-8)} for weekly-hours columns.
+
+    Finds the header row with consecutive integers in [12, 19] (12→S1, …, 19→S8).
+    """
+    result = _detect_col_range(ws, 12, 19, 11)
+    if not result:
+        print("WARNING: semester (weekly hours) header row not found")
+        return {}
+    max_semesters = _extract_program_years(ws) * 2
+    return {col: sem for col, sem in result.items() if sem <= max_semesters}
 
 
 def detect_course_columns(
@@ -259,6 +280,135 @@ def _extract_semester_credits(
     return result
 
 
+def parse_selective_courses(ws) -> list[dict]:
+    """Parse section 2 (tanlov fanlar / selective courses).
+
+    Returns a list of slot dicts. Each slot has the same numeric fields as a
+    core course plus an 'alternatives' list of {code, name} dicts — one per
+    alternative course offered in that slot.
+
+    Numeric columns (hours, lecture, …, semester_credits) are vertically merged
+    in the spreadsheet, so their values appear only on the first row of each
+    slot; continuation rows carry only code and name.
+    """
+    (
+        num_col,
+        code_col,
+        name_col,
+        hours_col,
+        classroom_col,
+        lecture_col,
+        practice_col,
+        lab_col,
+        seminar_col,
+        course_proj_col,
+    ) = detect_course_columns(ws)
+    semester_col_map = detect_semester_columns(ws)
+    weekly_col_map = detect_weekly_hours_columns(ws)
+    slots = []
+    in_selective_section = False
+    current_slot = None
+
+    for row in ws.iter_rows(values_only=True):
+        num = row[num_col] if len(row) > num_col else None
+        code = row[code_col] if len(row) > code_col else None
+        name = row[name_col] if len(row) > name_col else None
+        hours_raw = row[hours_col] if len(row) > hours_col else None
+
+        num_str = str(num).strip().rstrip(".") if num is not None else None
+
+        if num_str == "2.00":
+            in_selective_section = True
+            continue
+
+        if in_selective_section and any(
+            cell is not None and str(cell).strip() == "Jami:" for cell in row
+        ):
+            break
+
+        if in_selective_section and num_str is not None and re.match(
+            r"^\d+\.00$", num_str
+        ):
+            break
+
+        if (
+            in_selective_section
+            and is_course_number(num_str)
+            and section_prefix(num_str) == "2"
+        ):
+            if current_slot is not None:
+                slots.append(current_slot)
+            try:
+                hours_str = str(int(float(hours_raw))) if hours_raw is not None else ""
+            except (ValueError, TypeError):
+                hours_str = str(hours_raw).strip() if hours_raw is not None else ""
+            try:
+                credits = (
+                    str(int(float(hours_raw) / 30)) if hours_raw is not None else ""
+                )
+            except (ValueError, TypeError):
+                credits = ""
+            # Breakdown values from the slot row are the defaults for all
+            # alternatives. Continuation rows inherit these when their cells
+            # are None (vertically merged); non-None values override them.
+            slot_breakdown = {
+                "classroom": _int_val(row, classroom_col),
+                "lecture": _int_val(row, lecture_col),
+                "practice": _int_val(row, practice_col),
+                "lab": _int_val(row, lab_col),
+                "seminar": _int_val(row, seminar_col),
+                "course_proj": _int_val(row, course_proj_col),
+            }
+            current_slot = {
+                "num": num_str,
+                "hours": hours_str,
+                "credits": credits,
+                "semester_credits": _extract_semester_credits(row, semester_col_map),
+                "semester_weekly_hours": _extract_semester_credits(
+                    row, weekly_col_map
+                ),
+                "_breakdown_defaults": slot_breakdown,
+                "alternatives": [],
+            }
+            code_str = str(code).strip() if code is not None else ""
+            name_str = str(name).strip() if name is not None else ""
+            if code_str or name_str:
+                current_slot["alternatives"].append(
+                    {"code": code_str, "name": name_str, **slot_breakdown}
+                )
+
+        elif in_selective_section and current_slot is not None and num is None:
+            code_str = str(code).strip() if code is not None else ""
+            name_str = str(name).strip() if name is not None else ""
+            if code_str or name_str:
+                d = current_slot["_breakdown_defaults"]
+                current_slot["alternatives"].append(
+                    {
+                        "code": code_str,
+                        "name": name_str,
+                        "classroom": _int_val(row, classroom_col, d["classroom"]),
+                        "lecture": _int_val(row, lecture_col, d["lecture"]),
+                        "practice": _int_val(row, practice_col, d["practice"]),
+                        "lab": _int_val(row, lab_col, d["lab"]),
+                        "seminar": _int_val(row, seminar_col, d["seminar"]),
+                        "course_proj": _int_val(
+                            row, course_proj_col, d["course_proj"]
+                        ),
+                    }
+                )
+
+    if current_slot is not None:
+        slots.append(current_slot)
+
+    for slot in slots:
+        slot.pop("_breakdown_defaults", None)
+
+    if not slots:
+        print("WARNING: no selective courses found")
+
+    return slots
+
+
 def parse_core_courses(ws) -> list[dict]:
     (
         num_col,
@@ -273,6 +423,7 @@ def parse_core_courses(ws) -> list[dict]:
         course_proj_col,
     ) = detect_course_columns(ws)
     semester_col_map = detect_semester_columns(ws)
+    weekly_col_map = detect_weekly_hours_columns(ws)
     courses = []
     in_core_section = False
 
@@ -327,6 +478,9 @@ def parse_core_courses(ws) -> list[dict]:
                     "course_proj": _int_val(row, course_proj_col),
                     "semester_credits": _extract_semester_credits(
                         row, semester_col_map
+                    ),
+                    "semester_weekly_hours": _extract_semester_credits(
+                        row, weekly_col_map
                     ),
                 }
             )

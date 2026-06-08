@@ -2,6 +2,12 @@
 
 ---
 
+**Task:** Parse selective courses (tanlov fanlar), add weekly hours columns, fix semester range for sub-8-semester programs, and handle per-alternative hour breakdowns
+**Solution:** Added `parse_selective_courses(ws)` to `parser.py` — walks section 2 rows, reads numeric slot data from the merged top-left row per slot, and collects alternatives by inheriting slot defaults when continuation rows are `None` (merged case) or using their own values when non-`None` (non-merged, e.g. `mt_23.xlsx` slot 2.01 where SITQ2 has 0 lecture but MTSTE204 has 60). Breakdown fields (classroom, lecture, practice, lab, seminar, course_proj) were moved from slot-level into each alternative dict with `_breakdown_defaults` as a private slot-level fallback. Extracted a shared `_detect_col_range(ws, lo, hi, offset)` helper so both `detect_semester_columns` and the new `detect_weekly_hours_columns` reuse the same scan logic. Credit columns (20–27 for 4-year, 18–23 for 3-year) are now derived dynamically as `lo=12+N, hi=11+2N, offset=11+N` so programs shorter than 4 years map correctly. `build_markdown` extended with `selective_slots` parameter, interleaved `S{n}|W{n}` semester columns, and a new "## Tanlov Fanlar" table section.
+**Date:** 2026-06-08
+
+---
+
 **Task:** Fix semester detection bleeding into "Kredit taqsimoti" section on sub-8-semester programs
 **Solution:** For a 3-year (6-semester) program like `mt_23.xlsx`, the column-numbering row places the "Semestrdagi auditoriya" section at global columns 12–17 and the "Kredit taqsimoti" section at 18+. The previous detector looked for unique consecutive values in [12, 19], so columns 18–19 of the Kredit section were incorrectly captured as semesters 7–8. Fixed by adding `_extract_program_years(ws)` (reuses existing `find_cell_containing(ws, "muddati")`, parses `"N yil"`, defaults to 4) and filtering the detected map to `sem_num <= years * 2` at the end of `detect_semester_columns`.
 **Date:** 2026-06-08
