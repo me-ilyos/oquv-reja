@@ -86,11 +86,8 @@ def _extract_program_years(ws) -> int:
 
 
 def _find_anchor(ws) -> tuple[int | None, int | None]:
-    """Locate the '1.00' marker cell. Returns (0-based num_col, 1-based row).
-
-    Returns (None, None) if no anchor is found. This cell anchors all column
-    and header-row detection, so it is found once and reused.
-    """
+    """Locate the '1.00' marker cell. Returns (0-based num_col, 1-based row),
+    or (None, None) if not found. Anchors all column/header detection."""
     for row in ws.iter_rows():
         for cell in row:
             if cell.value is not None and re.match(
@@ -174,10 +171,8 @@ def detect_weekly_hours_columns(ws, years: int) -> dict[int, int]:
 
 
 def _find_code_name_cols(ws, num_col: int, start_row: int) -> tuple[int, int]:
-    """Find the code and name columns from the first course row below the anchor.
-
-    Falls back to num_col+1 / num_col+2 when the row can't be located.
-    """
+    """Find code/name columns from the first course row below the anchor;
+    fall back to num_col+1 / num_col+2 when the row can't be located."""
     code_col, name_col = None, None
     for data_row in ws.iter_rows(
         min_row=start_row + 1, max_row=start_row + 10, values_only=True
@@ -209,11 +204,9 @@ def _find_hours_col(ws, start_row: int, name_col: int) -> int:
 
 
 def _find_classroom_col(ws, start_row: int, hours_col: int) -> tuple[int, int | None]:
-    """Find the classroom ('auditoriya') column and the header row it sits on.
-
-    Returns (classroom_col, auditoriya_row); auditoriya_row is None when the
-    header is absent and classroom_col falls back to hours_col+2.
-    """
+    """Find the classroom ('auditoriya') column and the header row it sits on,
+    as (classroom_col, auditoriya_row). auditoriya_row is None (and classroom_col
+    falls back to hours_col+2) when the header is absent."""
     classroom_col = None
     auditoriya_row = None
     for hrow in ws.iter_rows(max_row=start_row):
@@ -270,10 +263,8 @@ def _find_subcategory_cols(
 
 
 def detect_course_columns(ws) -> ColumnLayout:
-    """Return the course ColumnLayout (ten 0-based indices) for a sheet.
-
-    Orchestrates the focused detectors; defaults to 0..9 if no anchor is found.
-    """
+    """Return the course ColumnLayout (ten 0-based indices) by orchestrating the
+    focused detectors; defaults to 0..9 if no anchor is found."""
     num_col, start_row = _find_anchor(ws)
     if start_row is None:
         return ColumnLayout(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
@@ -300,12 +291,9 @@ def detect_course_columns(ws) -> ColumnLayout:
 
 
 def detect_columns(ws) -> tuple[ColumnLayout, dict[int, int], dict[int, int]]:
-    """Detect everything position-dependent for a sheet, in one place.
-
-    Reads program duration once and reuses it for both semester maps. Returns
-    (course layout, semester-credit column map, weekly-hours column map) so the
-    parse functions don't each re-scan the sheet for the same anchors.
-    """
+    """Detect everything position-dependent for a sheet in one place: returns
+    (course layout, semester-credit map, weekly-hours map). Reads program
+    duration once so the parse functions don't each re-scan the same anchors."""
     years = _extract_program_years(ws)
     layout = detect_course_columns(ws)
     semester_map = detect_semester_columns(ws, years)
@@ -342,13 +330,9 @@ def _extract_semester_credits(
 
 
 def _warn_credit_mismatch(item) -> None:
-    """Flag (do not correct) when hours/30 disagrees with the per-semester sum.
-
-    The sheet carries credits twice: as a total (hours / 30, via
-    `derived_credits`) and split across semester columns. When both are present
-    and disagree, the parse or the source data is wrong; surface it rather than
-    silently trusting one. Accepts any Course/SelectiveSlot-shaped item.
-    """
+    """Flag (don't correct) when an item's derived_credits (hours/30) disagrees
+    with the sum of its per-semester credits. The sheet carries credits twice;
+    surface a disagreement rather than trusting one. Accepts Course/SelectiveSlot."""
     derived = item.derived_credits
     if derived is None or not item.semester_credits:
         return
