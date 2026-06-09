@@ -299,6 +299,19 @@ def _warn_credit_mismatch(num, hours_raw, semester_credits: dict) -> None:
         print(f"WARNING: {num} credit mismatch: hours/30={derived} vs sem-sum={s}")
 
 
+def _clean_name(value) -> str:
+    """Normalize a course/alternative name read from a cell.
+
+    Ministry templates use hard line breaks (Alt+Enter) in cells; a stray
+    newline or '|' inside a name would terminate a Markdown table row and
+    corrupt every row below it. Collapse all internal whitespace to single
+    spaces and replace '|' so the name is always row-safe.
+    """
+    if value is None:
+        return ""
+    return re.sub(r"\s+", " ", str(value).replace("|", " ")).strip()
+
+
 def parse_selective_courses(ws) -> list[dict]:
     """Parse section 2 (tanlov fanlar / selective courses).
 
@@ -393,7 +406,7 @@ def parse_selective_courses(ws) -> list[dict]:
                 "alternatives": [],
             }
             code_str = str(code).strip() if code is not None else ""
-            name_str = str(name).strip() if name is not None else ""
+            name_str = _clean_name(name)
             if code_str or name_str:
                 current_slot["alternatives"].append(
                     {"code": code_str, "name": name_str, **slot_breakdown}
@@ -401,7 +414,7 @@ def parse_selective_courses(ws) -> list[dict]:
 
         elif in_selective_section and current_slot is not None and num is None:
             code_str = str(code).strip() if code is not None else ""
-            name_str = str(name).strip() if name is not None else ""
+            name_str = _clean_name(name)
             if code_str or name_str:
                 d = current_slot["_breakdown_defaults"]
                 current_slot["alternatives"].append(
@@ -454,7 +467,7 @@ def parse_core_courses(ws) -> list[dict]:
         hours_raw = row[hours_col] if len(row) > hours_col else None
 
         num_str = str(num).strip().rstrip(".") if num is not None else None
-        name_str = str(name).strip() if name is not None else None
+        name_str = _clean_name(name)
 
         if num_str == "1.00":
             in_core_section = True
