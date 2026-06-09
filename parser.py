@@ -253,31 +253,31 @@ def detect_course_columns(
     )
 
 
-def _int_val(row, col, default="0") -> str:
-    v = row[col] if len(row) > col else None
-    if v is None:
-        return default
+def _to_int(value) -> int | None:
+    """Coerce an Excel cell value to int, or None if absent/non-numeric."""
+    if value is None:
+        return None
     try:
-        return str(int(float(v)))
+        return int(float(value))
     except (ValueError, TypeError):
-        return default
+        return None
+
+
+def _cell_int(row, col, default: int | None = None) -> int | None:
+    """Read row[col] as int, falling back to default when absent/non-numeric."""
+    val = _to_int(row[col]) if len(row) > col else None
+    return val if val is not None else default
 
 
 def _extract_semester_credits(
     row: tuple, semester_col_map: dict[int, int]
-) -> dict[int, str]:
-    """Return {semester_number: credit_string} for non-zero semester values."""
+) -> dict[int, int]:
+    """Return {semester_number: value} for non-zero semester cells."""
     result = {}
     for col_idx, sem_num in semester_col_map.items():
-        raw = row[col_idx] if len(row) > col_idx else None
-        if raw is None:
-            continue
-        try:
-            int_val = int(float(raw))
-        except (ValueError, TypeError):
-            continue
-        if int_val != 0:
-            result[sem_num] = str(int_val)
+        val = _cell_int(row, col_idx)
+        if val:
+            result[sem_num] = val
     return result
 
 
@@ -294,7 +294,7 @@ def _warn_credit_mismatch(num, hours_raw, semester_credits: dict) -> None:
         derived = int(float(hours_raw) / 30)
     except (ValueError, TypeError):
         return
-    s = sum(int(v) for v in semester_credits.values())
+    s = sum(semester_credits.values())
     if derived != s:
         print(f"WARNING: {num} credit mismatch: hours/30={derived} vs sem-sum={s}")
 
@@ -373,32 +373,24 @@ def parse_selective_courses(ws) -> list[dict]:
         ):
             if current_slot is not None:
                 slots.append(current_slot)
-            try:
-                hours_str = str(int(float(hours_raw))) if hours_raw is not None else ""
-            except (ValueError, TypeError):
-                hours_str = str(hours_raw).strip() if hours_raw is not None else ""
-            try:
-                credits = (
-                    str(int(float(hours_raw) / 30)) if hours_raw is not None else ""
-                )
-            except (ValueError, TypeError):
-                credits = ""
+            hours = _to_int(hours_raw)
+            credits = hours // 30 if hours is not None else None
             # Breakdown values from the slot row are the defaults for all
             # alternatives. Continuation rows inherit these when their cells
             # are None (vertically merged); non-None values override them.
             slot_breakdown = {
-                "classroom": _int_val(row, classroom_col),
-                "lecture": _int_val(row, lecture_col),
-                "practice": _int_val(row, practice_col),
-                "lab": _int_val(row, lab_col),
-                "seminar": _int_val(row, seminar_col),
-                "course_proj": _int_val(row, course_proj_col),
+                "classroom": _cell_int(row, classroom_col, 0),
+                "lecture": _cell_int(row, lecture_col, 0),
+                "practice": _cell_int(row, practice_col, 0),
+                "lab": _cell_int(row, lab_col, 0),
+                "seminar": _cell_int(row, seminar_col, 0),
+                "course_proj": _cell_int(row, course_proj_col, 0),
             }
             sem_credits = _extract_semester_credits(row, semester_col_map)
             _warn_credit_mismatch(num_str, hours_raw, sem_credits)
             current_slot = {
                 "num": num_str,
-                "hours": hours_str,
+                "hours": hours,
                 "credits": credits,
                 "semester_credits": sem_credits,
                 "semester_weekly_hours": _extract_semester_credits(row, weekly_col_map),
@@ -421,12 +413,14 @@ def parse_selective_courses(ws) -> list[dict]:
                     {
                         "code": code_str,
                         "name": name_str,
-                        "classroom": _int_val(row, classroom_col, d["classroom"]),
-                        "lecture": _int_val(row, lecture_col, d["lecture"]),
-                        "practice": _int_val(row, practice_col, d["practice"]),
-                        "lab": _int_val(row, lab_col, d["lab"]),
-                        "seminar": _int_val(row, seminar_col, d["seminar"]),
-                        "course_proj": _int_val(row, course_proj_col, d["course_proj"]),
+                        "classroom": _cell_int(row, classroom_col, d["classroom"]),
+                        "lecture": _cell_int(row, lecture_col, d["lecture"]),
+                        "practice": _cell_int(row, practice_col, d["practice"]),
+                        "lab": _cell_int(row, lab_col, d["lab"]),
+                        "seminar": _cell_int(row, seminar_col, d["seminar"]),
+                        "course_proj": _cell_int(
+                            row, course_proj_col, d["course_proj"]
+                        ),
                     }
                 )
 
@@ -487,16 +481,8 @@ def parse_core_courses(ws) -> list[dict]:
             and is_course_number(num_str)
             and section_prefix(num_str) == "1"
         ):
-            try:
-                hours_str = str(int(float(hours_raw))) if hours_raw is not None else ""
-            except (ValueError, TypeError):
-                hours_str = str(hours_raw).strip() if hours_raw is not None else ""
-            try:
-                credits = (
-                    str(int(float(hours_raw) / 30)) if hours_raw is not None else ""
-                )
-            except (ValueError, TypeError):
-                credits = ""
+            hours = _to_int(hours_raw)
+            credits = hours // 30 if hours is not None else None
             sem_credits = _extract_semester_credits(row, semester_col_map)
             _warn_credit_mismatch(num_str, hours_raw, sem_credits)
             courses.append(
@@ -504,14 +490,14 @@ def parse_core_courses(ws) -> list[dict]:
                     "num": num_str,
                     "code": str(code).strip() if code else "",
                     "name": name_str or "",
-                    "hours": hours_str,
+                    "hours": hours,
                     "credits": credits,
-                    "classroom": _int_val(row, classroom_col),
-                    "lecture": _int_val(row, lecture_col),
-                    "practice": _int_val(row, practice_col),
-                    "lab": _int_val(row, lab_col),
-                    "seminar": _int_val(row, seminar_col),
-                    "course_proj": _int_val(row, course_proj_col),
+                    "classroom": _cell_int(row, classroom_col, 0),
+                    "lecture": _cell_int(row, lecture_col, 0),
+                    "practice": _cell_int(row, practice_col, 0),
+                    "lab": _cell_int(row, lab_col, 0),
+                    "seminar": _cell_int(row, seminar_col, 0),
+                    "course_proj": _cell_int(row, course_proj_col, 0),
                     "semester_credits": sem_credits,
                     "semester_weekly_hours": _extract_semester_credits(
                         row, weekly_col_map
