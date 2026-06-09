@@ -6,12 +6,13 @@ import openpyxl
 
 from formatter import build_markdown
 from parser import (
+    detect_columns,
     extract_direction,
     extract_start_year,
     find_cell_containing,
     parse_core_courses,
-    parse_selective_courses,
     parse_label_value,
+    parse_selective_courses,
     to_camel_case,
 )
 
@@ -52,8 +53,9 @@ def process_file(xlsx_path: Path) -> None:
     duration = parse_label_value(duration_cell.value) if duration_cell else ""
     edu_type = parse_label_value(edu_type_cell.value) if edu_type_cell else ""
 
-    core_courses = parse_core_courses(ws)
-    selective_slots = parse_selective_courses(ws)
+    layout, semester_map, weekly_map = detect_columns(ws)
+    core_courses = parse_core_courses(ws, layout, semester_map, weekly_map)
+    selective_slots = parse_selective_courses(ws, layout, semester_map, weekly_map)
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     if start_year:

@@ -1,5 +1,7 @@
 import re
 
+from models import Alternative, ColumnLayout, Course, SelectiveSlot
+
 COURSE_NUM_RE = re.compile(r"^\d+\.\d+(\.\d+)?$")
 
 
@@ -122,14 +124,14 @@ def _detect_col_range(ws, lo: int, hi: int, offset: int) -> dict[int, int]:
     return last_match or {}
 
 
-def detect_semester_columns(ws) -> dict[int, int]:
+def detect_semester_columns(ws, years: int) -> dict[int, int]:
     """Return {0-based col index: semester number (1-N)} for credit columns.
 
     The credit columns are labeled (12+N) to (11+2N) in the header row, where
-    N = total semesters (program_years * 2). For a 4-year program N=8: range [20,27],
+    N = total semesters (years * 2). For a 4-year program N=8: range [20,27],
     offset=19. For a 3-year program N=6: range [18,23], offset=17.
     """
-    n = _extract_program_years(ws) * 2
+    n = years * 2
     lo, hi, offset = 12 + n, 11 + 2 * n, 11 + n
     result = _detect_col_range(ws, lo, hi, offset)
     if not result:
@@ -138,7 +140,7 @@ def detect_semester_columns(ws) -> dict[int, int]:
     return {col: sem for col, sem in result.items() if sem <= n}
 
 
-def detect_weekly_hours_columns(ws) -> dict[int, int]:
+def detect_weekly_hours_columns(ws, years: int) -> dict[int, int]:
     """Return {0-based col index: semester number (1-8)} for weekly-hours columns.
 
     Finds the header row with consecutive integers in [12, 19] (12→S1, …, 19→S8).
@@ -147,8 +149,7 @@ def detect_weekly_hours_columns(ws) -> dict[int, int]:
     if not result:
         print("WARNING: semester (weekly hours) header row not found")
         return {}
-    max_semesters = _extract_program_years(ws) * 2
-    return {col: sem for col, sem in result.items() if sem <= max_semesters}
+    return {col: sem for col, sem in result.items() if sem <= years * 2}
 
 
 def _find_code_name_cols(ws, num_col: int, start_row: int) -> tuple[int, int]:
@@ -247,17 +248,14 @@ def _find_subcategory_cols(
     return lecture_col, practice_col, lab_col, seminar_col, course_proj_col
 
 
-def detect_course_columns(
-    ws,
-) -> tuple[int, int, int, int, int, int, int, int, int, int]:
-    """Return the ten 0-based course column indices (num, code, name, hours,
-    classroom, lecture, practice, lab, seminar, course_proj).
+def detect_course_columns(ws) -> ColumnLayout:
+    """Return the course ColumnLayout (ten 0-based indices) for a sheet.
 
     Orchestrates the focused detectors; defaults to 0..9 if no anchor is found.
     """
     num_col, start_row = _find_anchor(ws)
     if start_row is None:
-        return 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+        return ColumnLayout(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 
     code_col, name_col = _find_code_name_cols(ws, num_col, start_row)
     hours_col = _find_hours_col(ws, start_row, name_col)
@@ -266,18 +264,32 @@ def detect_course_columns(
         _find_subcategory_cols(ws, auditoriya_row, classroom_col)
     )
 
-    return (
-        num_col,
-        code_col,
-        name_col,
-        hours_col,
-        classroom_col,
-        lecture_col,
-        practice_col,
-        lab_col,
-        seminar_col,
-        course_proj_col,
+    return ColumnLayout(
+        num=num_col,
+        code=code_col,
+        name=name_col,
+        hours=hours_col,
+        classroom=classroom_col,
+        lecture=lecture_col,
+        practice=practice_col,
+        lab=lab_col,
+        seminar=seminar_col,
+        course_proj=course_proj_col,
     )
+
+
+def detect_columns(ws) -> tuple[ColumnLayout, dict[int, int], dict[int, int]]:
+    """Detect everything position-dependent for a sheet, in one place.
+
+    Reads program duration once and reuses it for both semester maps. Returns
+    (course layout, semester-credit column map, weekly-hours column map) so the
+    parse functions don't each re-scan the sheet for the same anchors.
+    """
+    years = _extract_program_years(ws)
+    layout = detect_course_columns(ws)
+    semester_map = detect_semester_columns(ws, years)
+    weekly_map = detect_weekly_hours_columns(ws, years)
+    return layout, semester_map, weekly_map
 
 
 def _to_int(value) -> int | None:
@@ -308,22 +320,20 @@ def _extract_semester_credits(
     return result
 
 
-def _warn_credit_mismatch(num, hours_raw, semester_credits: dict) -> None:
+def _warn_credit_mismatch(item) -> None:
     """Flag (do not correct) when hours/30 disagrees with the per-semester sum.
 
-    The sheet carries credits twice: as a total (hours / 30) and split across
-    semester columns. When both are present and disagree, the parse or the
-    source data is wrong; surface it rather than silently trusting one.
+    The sheet carries credits twice: as a total (hours / 30, via
+    `derived_credits`) and split across semester columns. When both are present
+    and disagree, the parse or the source data is wrong; surface it rather than
+    silently trusting one. Accepts any Course/SelectiveSlot-shaped item.
     """
-    if hours_raw is None or not semester_credits:
+    derived = item.derived_credits
+    if derived is None or not item.semester_credits:
         return
-    try:
-        derived = int(float(hours_raw) / 30)
-    except (ValueError, TypeError):
-        return
-    s = sum(semester_credits.values())
+    s = sum(item.semester_credits.values())
     if derived != s:
-        print(f"WARNING: {num} credit mismatch: hours/30={derived} vs sem-sum={s}")
+        print(f"WARNING: {item.num} credit mismatch: hours/30={derived} vs sem-sum={s}")
 
 
 def _clean_name(value) -> str:
@@ -385,90 +395,56 @@ def _breakdown(row, cols: tuple, defaults) -> dict:
     return {f: _cell_int(row, c, defaults) for f, c in zip(BREAKDOWN_FIELDS, cols)}
 
 
-def parse_selective_courses(ws) -> list[dict]:
-    """Parse section 2 (tanlov fanlar / selective courses).
+def parse_selective_courses(
+    ws,
+    layout: ColumnLayout,
+    semester_map: dict[int, int],
+    weekly_map: dict[int, int],
+) -> list[SelectiveSlot]:
+    """Parse section 2 (tanlov fanlar / selective courses) into SelectiveSlots.
 
-    Returns a list of slot dicts. Each slot has the same numeric fields as a
-    core course plus an 'alternatives' list of {code, name} dicts — one per
-    alternative course offered in that slot.
-
-    Numeric columns (hours, lecture, …, semester_credits) are vertically merged
-    in the spreadsheet, so their values appear only on the first row of each
-    slot; continuation rows carry only code and name.
+    Each slot carries the shared hours/credits plus an `alternatives` list.
+    Numeric columns are vertically merged in the spreadsheet, so their values
+    appear only on the slot's first row; continuation rows carry only code and
+    name and inherit the slot's breakdown for any merged (None) cell.
     """
-    (
-        num_col,
-        code_col,
-        name_col,
-        hours_col,
-        classroom_col,
-        lecture_col,
-        practice_col,
-        lab_col,
-        seminar_col,
-        course_proj_col,
-    ) = detect_course_columns(ws)
-    semester_col_map = detect_semester_columns(ws)
-    weekly_col_map = detect_weekly_hours_columns(ws)
-    breakdown_cols = (
-        classroom_col,
-        lecture_col,
-        practice_col,
-        lab_col,
-        seminar_col,
-        course_proj_col,
-    )
-    slots = []
-    current_slot = None
+    slots: list[SelectiveSlot] = []
+    current: SelectiveSlot | None = None
+    slot_breakdown: dict = {}
 
-    for num_str, row in _iter_section_rows(ws, num_col, 2):
-        code = row[code_col] if len(row) > code_col else None
-        name = row[name_col] if len(row) > name_col else None
+    for num_str, row in _iter_section_rows(ws, layout.num, 2):
+        code = row[layout.code] if len(row) > layout.code else None
+        name = row[layout.name] if len(row) > layout.name else None
         code_str = str(code).strip() if code is not None else ""
         name_str = _clean_name(name)
 
         if is_course_number(num_str) and section_prefix(num_str) == "2":
-            if current_slot is not None:
-                slots.append(current_slot)
-            hours_raw = row[hours_col] if len(row) > hours_col else None
-            hours = _to_int(hours_raw)
-            credits = hours // 30 if hours is not None else None
-            # Breakdown values from the slot row are the defaults for all
-            # alternatives. Continuation rows inherit these when their cells
-            # are None (vertically merged); non-None values override them.
-            slot_breakdown = _breakdown(row, breakdown_cols, 0)
-            sem_credits = _extract_semester_credits(row, semester_col_map)
-            _warn_credit_mismatch(num_str, hours_raw, sem_credits)
-            current_slot = {
-                "num": num_str,
-                "hours": hours,
-                "credits": credits,
-                "semester_credits": sem_credits,
-                "semester_weekly_hours": _extract_semester_credits(row, weekly_col_map),
-                "_breakdown_defaults": slot_breakdown,
-                "alternatives": [],
-            }
+            hours_raw = row[layout.hours] if len(row) > layout.hours else None
+            current = SelectiveSlot(
+                num=num_str,
+                hours=_to_int(hours_raw),
+                semester_credits=_extract_semester_credits(row, semester_map),
+                semester_weekly_hours=_extract_semester_credits(row, weekly_map),
+            )
+            slots.append(current)
+            _warn_credit_mismatch(current)
+            # The slot row's breakdown is the default for every alternative;
+            # continuation rows inherit it where their cells are merged (None).
+            slot_breakdown = _breakdown(row, layout.breakdown, 0)
             if code_str or name_str:
-                current_slot["alternatives"].append(
-                    {"code": code_str, "name": name_str, **slot_breakdown}
+                current.alternatives.append(
+                    Alternative(code=code_str, name=name_str, **slot_breakdown)
                 )
 
-        elif current_slot is not None and num_str is None:
+        elif current is not None and num_str is None:
             if code_str or name_str:
-                d = current_slot["_breakdown_defaults"]
-                current_slot["alternatives"].append(
-                    {
-                        "code": code_str,
-                        "name": name_str,
-                        **_breakdown(row, breakdown_cols, d),
-                    }
+                current.alternatives.append(
+                    Alternative(
+                        code=code_str,
+                        name=name_str,
+                        **_breakdown(row, layout.breakdown, slot_breakdown),
+                    )
                 )
-
-    if current_slot is not None:
-        slots.append(current_slot)
-
-    for slot in slots:
-        slot.pop("_breakdown_defaults", None)
 
     if not slots:
         print("WARNING: no selective courses found")
@@ -476,52 +452,31 @@ def parse_selective_courses(ws) -> list[dict]:
     return slots
 
 
-def parse_core_courses(ws) -> list[dict]:
-    (
-        num_col,
-        code_col,
-        name_col,
-        hours_col,
-        classroom_col,
-        lecture_col,
-        practice_col,
-        lab_col,
-        seminar_col,
-        course_proj_col,
-    ) = detect_course_columns(ws)
-    semester_col_map = detect_semester_columns(ws)
-    weekly_col_map = detect_weekly_hours_columns(ws)
-    breakdown_cols = (
-        classroom_col,
-        lecture_col,
-        practice_col,
-        lab_col,
-        seminar_col,
-        course_proj_col,
-    )
-    courses = []
+def parse_core_courses(
+    ws,
+    layout: ColumnLayout,
+    semester_map: dict[int, int],
+    weekly_map: dict[int, int],
+) -> list[Course]:
+    """Parse section 1 (majburiy fanlar / core courses) into Courses."""
+    courses: list[Course] = []
 
-    for num_str, row in _iter_section_rows(ws, num_col, 1):
+    for num_str, row in _iter_section_rows(ws, layout.num, 1):
         if not (is_course_number(num_str) and section_prefix(num_str) == "1"):
             continue
-        code = row[code_col] if len(row) > code_col else None
-        name = row[name_col] if len(row) > name_col else None
-        hours_raw = row[hours_col] if len(row) > hours_col else None
-        hours = _to_int(hours_raw)
-        credits = hours // 30 if hours is not None else None
-        sem_credits = _extract_semester_credits(row, semester_col_map)
-        _warn_credit_mismatch(num_str, hours_raw, sem_credits)
-        courses.append(
-            {
-                "num": num_str,
-                "code": str(code).strip() if code else "",
-                "name": _clean_name(name),
-                "hours": hours,
-                "credits": credits,
-                **_breakdown(row, breakdown_cols, 0),
-                "semester_credits": sem_credits,
-                "semester_weekly_hours": _extract_semester_credits(row, weekly_col_map),
-            }
+        code = row[layout.code] if len(row) > layout.code else None
+        name = row[layout.name] if len(row) > layout.name else None
+        hours_raw = row[layout.hours] if len(row) > layout.hours else None
+        course = Course(
+            num=num_str,
+            code=str(code).strip() if code else "",
+            name=_clean_name(name),
+            hours=_to_int(hours_raw),
+            **_breakdown(row, layout.breakdown, 0),
+            semester_credits=_extract_semester_credits(row, semester_map),
+            semester_weekly_hours=_extract_semester_credits(row, weekly_map),
         )
+        _warn_credit_mismatch(course)
+        courses.append(course)
 
     return courses

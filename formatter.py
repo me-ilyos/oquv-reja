@@ -1,3 +1,6 @@
+from models import Course, SelectiveSlot
+
+
 def _cell(value) -> str:
     """Render a numeric field for Markdown: None becomes an empty cell."""
     return "" if value is None else str(value)
@@ -8,19 +11,33 @@ def _row(cells: list[str], suffix: str = "") -> str:
     return "| " + " | ".join(cells) + " |" + suffix
 
 
+def _breakdown(obj) -> list[str]:
+    """The six hour-breakdown cells of a Course/Alternative, or blanks if None."""
+    if obj is None:
+        return ["", "", "", "", "", ""]
+    return [
+        _cell(obj.classroom),
+        _cell(obj.lecture),
+        _cell(obj.practice),
+        _cell(obj.lab),
+        _cell(obj.seminar),
+        _cell(obj.course_proj),
+    ]
+
+
 def build_markdown(
     title: str,
     start_year: str,
     degree: str,
     duration: str,
     edu_type: str,
-    core_courses: list[dict],
-    selective_slots: list[dict] | None = None,
+    core_courses: list[Course],
+    selective_slots: list[SelectiveSlot] | None = None,
 ) -> str:
     all_items = list(core_courses) + list(selective_slots or [])
     active_semesters = sorted(
-        {sem for item in all_items for sem in item.get("semester_credits", {})}
-        | {sem for item in all_items for sem in item.get("semester_weekly_hours", {})}
+        {sem for item in all_items for sem in item.semester_credits}
+        | {sem for item in all_items for sem in item.semester_weekly_hours}
     )
 
     lines = [f"# Oquv Reja: {title}", ""]
@@ -49,32 +66,21 @@ def build_markdown(
     lines.append(header)
     lines.append(separator)
 
-    def sem_cells(item: dict) -> str:
-        credits = item.get("semester_credits", {})
-        weekly = item.get("semester_weekly_hours", {})
+    def sem_cells(item) -> str:
         return "".join(
-            f" {_cell(credits.get(s))} | {_cell(weekly.get(s))} |"
+            f" {_cell(item.semester_credits.get(s))} |"
+            f" {_cell(item.semester_weekly_hours.get(s))} |"
             for s in active_semesters
         )
 
-    def breakdown(d: dict) -> list[str]:
-        return [
-            _cell(d.get("classroom")),
-            _cell(d.get("lecture")),
-            _cell(d.get("practice")),
-            _cell(d.get("lab")),
-            _cell(d.get("seminar")),
-            _cell(d.get("course_proj")),
-        ]
-
     for course in core_courses:
         cells = [
-            course["num"],
-            course["code"],
-            course["name"],
-            _cell(course["hours"]),
-            _cell(course["credits"]),
-            *breakdown(course),
+            course.num,
+            course.code,
+            course.name,
+            _cell(course.hours),
+            _cell(course.derived_credits),
+            *_breakdown(course),
         ]
         lines.append(_row(cells, sem_cells(course)))
 
@@ -86,19 +92,18 @@ def build_markdown(
         lines.append(separator)
         empty_sem = "".join("  |  |" for _ in active_semesters)
         for slot in selective_slots:
-            alts = slot.get("alternatives", [])
-            first = alts[0] if alts else {}
+            first = slot.alternatives[0] if slot.alternatives else None
             cells = [
-                slot["num"],
-                first.get("code", ""),
-                first.get("name", ""),
-                _cell(slot["hours"]),
-                _cell(slot["credits"]),
-                *breakdown(first),
+                slot.num,
+                first.code if first else "",
+                first.name if first else "",
+                _cell(slot.hours),
+                _cell(slot.derived_credits),
+                *_breakdown(first),
             ]
             lines.append(_row(cells, sem_cells(slot)))
-            for alt in alts[1:]:
-                cells = ["", alt["code"], alt["name"], "", "", *breakdown(alt)]
+            for alt in slot.alternatives[1:]:
+                cells = ["", alt.code, alt.name, "", "", *_breakdown(alt)]
                 lines.append(_row(cells, empty_sem))
 
     lines.append("")
