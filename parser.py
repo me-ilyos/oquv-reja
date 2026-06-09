@@ -29,10 +29,31 @@ def parse_label_value(raw: str) -> str:
 
 
 def extract_direction(raw: str) -> tuple[str, str]:
+    """Split a 'CODE - Name' direction string into (code, name)."""
     match = re.search(r"\d{6,9}", raw)
     code = match.group() if match else ""
-    parts = raw.split(" - ", 1)
-    name = parts[1].strip() if len(parts) > 1 else raw.strip()
+    return code, parse_label_value(raw)
+
+
+def resolve_direction(ws) -> tuple[str, str] | None:
+    """Find and parse the program-direction cell into (code, name).
+
+    Returns None when no direction cell is present (caller falls back to the
+    filename). Handles the variant where the code and name are split across two
+    vertically adjacent rows by reading the cell below when the primary cell has
+    no digit code. Warns when a cell is found but yields no code.
+    """
+    cell = find_cell_containing(ws, "nalishi:")
+    if cell is None:
+        return None
+    raw = cell.value or ""
+    if not re.search(r"\d{6,9}", raw):
+        below = ws.cell(row=cell.row + 1, column=cell.column)
+        if below.value:
+            raw = f"{raw} {below.value}"
+    code, name = extract_direction(raw)
+    if not code:
+        print(f"  WARNING: no direction code found in: {raw!r}")
     return code, name
 
 

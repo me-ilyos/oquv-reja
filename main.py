@@ -1,5 +1,4 @@
 import argparse
-import re
 from pathlib import Path
 
 import openpyxl
@@ -7,12 +6,12 @@ import openpyxl
 from formatter import build_markdown
 from parser import (
     detect_columns,
-    extract_direction,
     extract_start_year,
     find_cell_containing,
     parse_core_courses,
     parse_label_value,
     parse_selective_courses,
+    resolve_direction,
     to_camel_case,
 )
 
@@ -24,23 +23,16 @@ def process_file(xlsx_path: Path) -> None:
     wb = openpyxl.load_workbook(xlsx_path, data_only=True)
     ws = wb.active
 
-    direction_cell = find_cell_containing(ws, "nalishi:")
-    year_cell = find_cell_containing(ws, "quv yili")
-
-    if direction_cell:
-        direction_raw = direction_cell.value or ""
-        if not re.search(r"\d{6,9}", direction_raw):
-            below = ws.cell(row=direction_cell.row + 1, column=direction_cell.column)
-            if below.value:
-                direction_raw = direction_raw + " " + str(below.value)
-        code, name = extract_direction(direction_raw)
-        if not code:
-            print(f"  WARNING: no direction code found in: {direction_raw!r}")
+    direction = resolve_direction(ws)
+    if direction is not None:
+        code, name = direction
         stem = f"{to_camel_case(name)}_{code}" if code else to_camel_case(name)
         title = name
     else:
         stem = xlsx_path.stem
         title = xlsx_path.stem
+
+    year_cell = find_cell_containing(ws, "quv yili")
 
     year_raw = year_cell.value if year_cell else None
     start_year = extract_start_year(year_raw) if year_raw else ""
