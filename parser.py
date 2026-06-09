@@ -62,6 +62,21 @@ def _extract_program_years(ws) -> int:
     return int(match.group(1))
 
 
+def _find_anchor(ws) -> tuple[int | None, int | None]:
+    """Locate the '1.00' marker cell. Returns (0-based num_col, 1-based row).
+
+    Returns (None, None) if no anchor is found. This cell anchors all column
+    and header-row detection, so it is found once and reused.
+    """
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.value is not None and re.match(
+                r"^1\.00\.?$", str(cell.value).strip()
+            ):
+                return cell.column - 1, cell.row
+    return None, None
+
+
 def _detect_col_range(ws, lo: int, hi: int, offset: int) -> dict[int, int]:
     """Scan header rows near the 1.00 anchor for consecutive ints in [lo, hi].
 
@@ -69,17 +84,7 @@ def _detect_col_range(ws, lo: int, hi: int, offset: int) -> dict[int, int]:
     or {} if no qualifying row is found. Used by detect_semester_columns and
     detect_weekly_hours_columns.
     """
-    start_row_num = None
-    for row in ws.iter_rows():
-        for cell in row:
-            if cell.value is not None and re.match(
-                r"^1\.00\.?$", str(cell.value).strip()
-            ):
-                start_row_num = cell.row
-                break
-        if start_row_num is not None:
-            break
-
+    _, start_row_num = _find_anchor(ws)
     if start_row_num is None:
         return {}
 
@@ -146,32 +151,14 @@ def detect_weekly_hours_columns(ws) -> dict[int, int]:
     return {col: sem for col, sem in result.items() if sem <= max_semesters}
 
 
-def detect_course_columns(
-    ws,
-) -> tuple[int, int, int, int, int, int, int, int, int, int]:
-    """Return (num_col, code_col, name_col, hours_col, classroom_col,
-    lecture_col, practice_col, lab_col, seminar_col, course_proj_col)
-    as 0-based indices."""
-    num_col = 0
-    start_row_num = None
+def _find_code_name_cols(ws, num_col: int, start_row: int) -> tuple[int, int]:
+    """Find the code and name columns from the first course row below the anchor.
 
-    for row in ws.iter_rows():
-        for cell in row:
-            if cell.value is not None and re.match(
-                r"^1\.00\.?$", str(cell.value).strip()
-            ):
-                num_col = cell.column - 1
-                start_row_num = cell.row
-                break
-        if start_row_num is not None:
-            break
-
-    if start_row_num is None:
-        return 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-
+    Falls back to num_col+1 / num_col+2 when the row can't be located.
+    """
     code_col, name_col = None, None
     for data_row in ws.iter_rows(
-        min_row=start_row_num + 1, max_row=start_row_num + 10, values_only=True
+        min_row=start_row + 1, max_row=start_row + 10, values_only=True
     ):
         if not data_row or data_row[num_col] is None:
             continue
@@ -191,13 +178,23 @@ def detect_course_columns(
         code_col = num_col + 1
     if name_col is None:
         name_col = num_col + 2
+    return code_col, name_col
 
-    hours_col = _scan_col(ws, "soat", start_row_num) or (name_col + 1)
 
-    # Find classroom_col; capture its row to read the label row below it.
+def _find_hours_col(ws, start_row: int, name_col: int) -> int:
+    """Locate the total-hours ('soat') column, falling back to name_col+1."""
+    return _scan_col(ws, "soat", start_row) or (name_col + 1)
+
+
+def _find_classroom_col(ws, start_row: int, hours_col: int) -> tuple[int, int | None]:
+    """Find the classroom ('auditoriya') column and the header row it sits on.
+
+    Returns (classroom_col, auditoriya_row); auditoriya_row is None when the
+    header is absent and classroom_col falls back to hours_col+2.
+    """
     classroom_col = None
     auditoriya_row = None
-    for hrow in ws.iter_rows(max_row=start_row_num):
+    for hrow in ws.iter_rows(max_row=start_row):
         for cell in hrow:
             if isinstance(cell.value, str) and "auditoriya" in cell.value.lower():
                 classroom_col = cell.column - 1
@@ -207,10 +204,19 @@ def detect_course_columns(
             break
     if classroom_col is None:
         classroom_col = hours_col + 2
+    return classroom_col, auditoriya_row
 
-    # The label row (auditoriya_row + 1) holds text labels "Ma'ruza", "Amaliy ...",
-    # "Seminar", "Laboratoriya", "Kurs ishi" for the subcategory columns.
-    # Normalize to plain ASCII letters to handle encoding variants and typos.
+
+def _find_subcategory_cols(
+    ws, auditoriya_row: int | None, classroom_col: int
+) -> tuple[int, int, int, int, int]:
+    """Map the label row below 'auditoriya' to the five subcategory columns.
+
+    The label row holds "Ma'ruza", "Amaliy …", "Seminar", "Laboratoriya",
+    "Kurs ishi". Labels are normalized to plain ASCII letters to absorb
+    encoding variants and typos; unmatched columns fall back to fixed offsets
+    from classroom_col.
+    """
     lecture_col = practice_col = lab_col = seminar_col = course_proj_col = None
     if auditoriya_row is not None:
         label_row = next(
@@ -238,6 +244,27 @@ def detect_course_columns(
     lab_col = lab_col or classroom_col + 3
     seminar_col = seminar_col or classroom_col + 4
     course_proj_col = course_proj_col or classroom_col + 5
+    return lecture_col, practice_col, lab_col, seminar_col, course_proj_col
+
+
+def detect_course_columns(
+    ws,
+) -> tuple[int, int, int, int, int, int, int, int, int, int]:
+    """Return the ten 0-based course column indices (num, code, name, hours,
+    classroom, lecture, practice, lab, seminar, course_proj).
+
+    Orchestrates the focused detectors; defaults to 0..9 if no anchor is found.
+    """
+    num_col, start_row = _find_anchor(ws)
+    if start_row is None:
+        return 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+
+    code_col, name_col = _find_code_name_cols(ws, num_col, start_row)
+    hours_col = _find_hours_col(ws, start_row, name_col)
+    classroom_col, auditoriya_row = _find_classroom_col(ws, start_row, hours_col)
+    lecture_col, practice_col, lab_col, seminar_col, course_proj_col = (
+        _find_subcategory_cols(ws, auditoriya_row, classroom_col)
+    )
 
     return (
         num_col,
