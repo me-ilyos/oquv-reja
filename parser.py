@@ -280,6 +280,24 @@ def _extract_semester_credits(
     return result
 
 
+def _warn_credit_mismatch(num, hours_raw, semester_credits: dict) -> None:
+    """Flag (do not correct) when hours/30 disagrees with the per-semester sum.
+
+    The sheet carries credits twice: as a total (hours / 30) and split across
+    semester columns. When both are present and disagree, the parse or the
+    source data is wrong; surface it rather than silently trusting one.
+    """
+    if hours_raw is None or not semester_credits:
+        return
+    try:
+        derived = int(float(hours_raw) / 30)
+    except (ValueError, TypeError):
+        return
+    s = sum(int(v) for v in semester_credits.values())
+    if derived != s:
+        print(f"WARNING: {num} credit mismatch: hours/30={derived} vs sem-sum={s}")
+
+
 def parse_selective_courses(ws) -> list[dict]:
     """Parse section 2 (tanlov fanlar / selective courses).
 
@@ -362,11 +380,13 @@ def parse_selective_courses(ws) -> list[dict]:
                 "seminar": _int_val(row, seminar_col),
                 "course_proj": _int_val(row, course_proj_col),
             }
+            sem_credits = _extract_semester_credits(row, semester_col_map)
+            _warn_credit_mismatch(num_str, hours_raw, sem_credits)
             current_slot = {
                 "num": num_str,
                 "hours": hours_str,
                 "credits": credits,
-                "semester_credits": _extract_semester_credits(row, semester_col_map),
+                "semester_credits": sem_credits,
                 "semester_weekly_hours": _extract_semester_credits(row, weekly_col_map),
                 "_breakdown_defaults": slot_breakdown,
                 "alternatives": [],
@@ -463,6 +483,8 @@ def parse_core_courses(ws) -> list[dict]:
                 )
             except (ValueError, TypeError):
                 credits = ""
+            sem_credits = _extract_semester_credits(row, semester_col_map)
+            _warn_credit_mismatch(num_str, hours_raw, sem_credits)
             courses.append(
                 {
                     "num": num_str,
@@ -476,9 +498,7 @@ def parse_core_courses(ws) -> list[dict]:
                     "lab": _int_val(row, lab_col),
                     "seminar": _int_val(row, seminar_col),
                     "course_proj": _int_val(row, course_proj_col),
-                    "semester_credits": _extract_semester_credits(
-                        row, semester_col_map
-                    ),
+                    "semester_credits": sem_credits,
                     "semester_weekly_hours": _extract_semester_credits(
                         row, weekly_col_map
                     ),
