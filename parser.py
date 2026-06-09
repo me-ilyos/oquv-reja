@@ -117,7 +117,7 @@ def _detect_col_range(ws, lo: int, hi: int, offset: int) -> dict[int, int]:
 
 
 def detect_semester_columns(ws) -> dict[int, int]:
-    """Return {0-based col index: semester number (1-N)} for credit-distribution columns.
+    """Return {0-based col index: semester number (1-N)} for credit columns.
 
     The credit columns are labeled (12+N) to (11+2N) in the header row, where
     N = total semesters (program_years * 2). For a 4-year program N=8: range [20,27],
@@ -322,12 +322,15 @@ def parse_selective_courses(ws) -> list[dict]:
             continue
 
         if in_selective_section and any(
-            cell is not None and str(cell).strip() == "Jami:" for cell in row
+            cell is not None and str(cell).strip().rstrip(":").casefold() == "jami"
+            for cell in row
         ):
             break
 
-        if in_selective_section and num_str is not None and re.match(
-            r"^\d+\.00$", num_str
+        if (
+            in_selective_section
+            and num_str is not None
+            and re.match(r"^\d+\.00$", num_str)
         ):
             break
 
@@ -364,9 +367,7 @@ def parse_selective_courses(ws) -> list[dict]:
                 "hours": hours_str,
                 "credits": credits,
                 "semester_credits": _extract_semester_credits(row, semester_col_map),
-                "semester_weekly_hours": _extract_semester_credits(
-                    row, weekly_col_map
-                ),
+                "semester_weekly_hours": _extract_semester_credits(row, weekly_col_map),
                 "_breakdown_defaults": slot_breakdown,
                 "alternatives": [],
             }
@@ -391,9 +392,7 @@ def parse_selective_courses(ws) -> list[dict]:
                         "practice": _int_val(row, practice_col, d["practice"]),
                         "lab": _int_val(row, lab_col, d["lab"]),
                         "seminar": _int_val(row, seminar_col, d["seminar"]),
-                        "course_proj": _int_val(
-                            row, course_proj_col, d["course_proj"]
-                        ),
+                        "course_proj": _int_val(row, course_proj_col, d["course_proj"]),
                     }
                 )
 
@@ -444,7 +443,8 @@ def parse_core_courses(ws) -> list[dict]:
             break
 
         if in_core_section and any(
-            cell is not None and str(cell).strip() == "Jami:" for cell in row
+            cell is not None and str(cell).strip().rstrip(":").casefold() == "jami"
+            for cell in row
         ):
             break
 
