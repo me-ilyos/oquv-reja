@@ -55,10 +55,11 @@ def _scan_col(ws, keyword: str, max_row: int):
 def _extract_program_years(ws) -> int:
     """Return program duration in years (e.g. 3 for '3 yil'). Defaults to 4."""
     cell = find_cell_containing(ws, "muddati")
-    if cell is None:
+    match = re.search(r"(\d+)\s*yil", str(cell.value or "")) if cell else None
+    if match is None:
+        print("WARNING: program duration not parsed; defaulting to 4 years")
         return 4
-    match = re.search(r"(\d+)\s*yil", str(cell.value or ""))
-    return int(match.group(1)) if match else 4
+    return int(match.group(1))
 
 
 def _detect_col_range(ws, lo: int, hi: int, offset: int) -> dict[int, int]:
