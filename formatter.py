@@ -1,27 +1,27 @@
 from models import Course, SelectiveSlot
 
 
-def _cell(value) -> str:
+def fmt_num(value) -> str:
     """Render a numeric field for Markdown: None becomes an empty cell."""
     return "" if value is None else str(value)
 
 
-def _row(cells: list[str], suffix: str = "") -> str:
+def md_row(cells: list[str], suffix: str = "") -> str:
     """Assemble a Markdown table row from cell strings, plus an optional suffix."""
     return "| " + " | ".join(cells) + " |" + suffix
 
 
-def _breakdown(obj) -> list[str]:
+def breakdown_cells(obj) -> list[str]:
     """The six hour-breakdown cells of a Course/Alternative, or blanks if None."""
     if obj is None:
         return ["", "", "", "", "", ""]
     return [
-        _cell(obj.classroom),
-        _cell(obj.lecture),
-        _cell(obj.practice),
-        _cell(obj.lab),
-        _cell(obj.seminar),
-        _cell(obj.course_proj),
+        fmt_num(obj.classroom),
+        fmt_num(obj.lecture),
+        fmt_num(obj.practice),
+        fmt_num(obj.lab),
+        fmt_num(obj.seminar),
+        fmt_num(obj.course_proj),
     ]
 
 
@@ -68,8 +68,8 @@ def build_markdown(
 
     def sem_cells(item) -> str:
         return "".join(
-            f" {_cell(item.semester_credits.get(s))} |"
-            f" {_cell(item.semester_weekly_hours.get(s))} |"
+            f" {fmt_num(item.semester_credits.get(s))} |"
+            f" {fmt_num(item.semester_weekly_hours.get(s))} |"
             for s in active_semesters
         )
 
@@ -78,11 +78,11 @@ def build_markdown(
             course.num,
             course.code,
             course.name,
-            _cell(course.hours),
-            _cell(course.derived_credits),
-            *_breakdown(course),
+            fmt_num(course.hours),
+            fmt_num(course.derived_credits),
+            *breakdown_cells(course),
         ]
-        lines.append(_row(cells, sem_cells(course)))
+        lines.append(md_row(cells, sem_cells(course)))
 
     if selective_slots:
         lines.append("")
@@ -97,14 +97,14 @@ def build_markdown(
                 slot.num,
                 first.code if first else "",
                 first.name if first else "",
-                _cell(slot.hours),
-                _cell(slot.derived_credits),
-                *_breakdown(first),
+                fmt_num(slot.hours),
+                fmt_num(slot.derived_credits),
+                *breakdown_cells(first),
             ]
-            lines.append(_row(cells, sem_cells(slot)))
+            lines.append(md_row(cells, sem_cells(slot)))
             for alt in slot.alternatives[1:]:
-                cells = ["", alt.code, alt.name, "", "", *_breakdown(alt)]
-                lines.append(_row(cells, empty_sem))
+                cells = ["", alt.code, alt.name, "", "", *breakdown_cells(alt)]
+                lines.append(md_row(cells, empty_sem))
 
     lines.append("")
     if start_year:

@@ -56,7 +56,11 @@ class Course:
 
     @property
     def derived_credits(self) -> int | None:
-        """Credits implied by total hours (1 credit = 30 hours)."""
+        """Credits implied by total hours (1 credit = 30 hours).
+
+        Duplicated on SelectiveSlot; kept separate so each dataclass stays a
+        standalone record with no shared base to reason about.
+        """
         return None if self.hours is None else self.hours // 30
 
 

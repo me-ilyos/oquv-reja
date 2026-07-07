@@ -23,16 +23,16 @@ def find_cell_containing(ws, substring: str):
     return None
 
 
-def parse_label_value(raw: str) -> str:
+def value_after_dash(raw: str) -> str:
     parts = raw.split(" - ", 1)
     return parts[1].strip() if len(parts) > 1 else raw.strip()
 
 
-def extract_direction(raw: str) -> tuple[str, str]:
+def split_direction(raw: str) -> tuple[str, str]:
     """Split a 'CODE - Name' direction string into (code, name)."""
     match = re.search(r"\d{6,9}", raw)
     code = match.group() if match else ""
-    return code, parse_label_value(raw)
+    return code, value_after_dash(raw)
 
 
 def resolve_direction(ws) -> tuple[str, str] | None:
@@ -51,13 +51,13 @@ def resolve_direction(ws) -> tuple[str, str] | None:
         below = ws.cell(row=cell.row + 1, column=cell.column)
         if below.value:
             raw = f"{raw} {below.value}"
-    code, name = extract_direction(raw)
+    code, name = split_direction(raw)
     if not code:
         print(f"  WARNING: no direction code found in: {raw!r}")
     return code, name
 
 
-def to_camel_case(name: str) -> str:
+def to_pascal_case(name: str) -> str:
     return "".join(re.sub(r"[^a-zA-Z0-9]", "", w).capitalize() for w in name.split())
 
 
@@ -66,7 +66,7 @@ def extract_start_year(raw: str) -> str:
     return match.group(1) if match else ""
 
 
-def _scan_col(ws, keyword: str, max_row: int):
+def find_header_col(ws, keyword: str, max_row: int):
     """Return 0-based column index of first header cell containing keyword, or None."""
     for row in ws.iter_rows(max_row=max_row):
         for cell in row:
@@ -198,9 +198,9 @@ def _find_code_name_cols(ws, num_col: int, start_row: int) -> tuple[int, int]:
     return code_col, name_col
 
 
-def _find_hours_col(ws, start_row: int, name_col: int) -> int:
+def find_total_hours_col(ws, start_row: int, name_col: int) -> int:
     """Locate the total-hours ('soat') column, falling back to name_col+1."""
-    return _scan_col(ws, "soat", start_row) or (name_col + 1)
+    return find_header_col(ws, "soat", start_row) or (name_col + 1)
 
 
 def _find_classroom_col(ws, start_row: int, hours_col: int) -> tuple[int, int | None]:
@@ -270,7 +270,7 @@ def detect_course_columns(ws) -> ColumnLayout:
         return ColumnLayout(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 
     code_col, name_col = _find_code_name_cols(ws, num_col, start_row)
-    hours_col = _find_hours_col(ws, start_row, name_col)
+    hours_col = find_total_hours_col(ws, start_row, name_col)
     classroom_col, auditoriya_row = _find_classroom_col(ws, start_row, hours_col)
     lecture_col, practice_col, lab_col, seminar_col, course_proj_col = (
         _find_subcategory_cols(ws, auditoriya_row, classroom_col)
@@ -290,7 +290,7 @@ def detect_course_columns(ws) -> ColumnLayout:
     )
 
 
-def detect_columns(ws) -> tuple[ColumnLayout, dict[int, int], dict[int, int]]:
+def detect_sheet_layout(ws) -> tuple[ColumnLayout, dict[int, int], dict[int, int]]:
     """Detect everything position-dependent for a sheet in one place: returns
     (course layout, semester-credit map, weekly-hours map). Reads program
     duration once so the parse functions don't each re-scan the same anchors."""
@@ -317,10 +317,12 @@ def _cell_int(row, col, default: int | None = None) -> int | None:
     return val if val is not None else default
 
 
-def _extract_semester_credits(
-    row: tuple, semester_col_map: dict[int, int]
-) -> dict[int, int]:
-    """Return {semester_number: value} for non-zero semester cells."""
+def map_semester_values(row: tuple, semester_col_map: dict[int, int]) -> dict[int, int]:
+    """Return {semester_number: value} for non-zero semester cells.
+
+    Shared by credit and weekly-hours extraction — both read one value per
+    semester off the same kind of column map.
+    """
     result = {}
     for col_idx, sem_num in semester_col_map.items():
         val = _cell_int(row, col_idx)
@@ -386,18 +388,30 @@ def _iter_section_rows(ws, num_col: int, section: int):
         yield num_str, row
 
 
-def _breakdown(row, cols: tuple, defaults) -> dict:
-    """Read the six hour-breakdown fields from a row.
+def breakdown_from(row, cols: tuple, fill: int) -> dict:
+    """Read the six hour-breakdown fields, defaulting every missing cell to `fill`.
 
-    `defaults` is either a single int (used for every field — the slot/course
-    case) or a dict of per-field fallbacks (the merged continuation-row case,
-    where a None cell inherits the slot's value).
+    Used for a course row or a selective slot's own row, where an absent value
+    means zero rather than 'inherit'.
     """
-    if isinstance(defaults, dict):
-        return {
-            f: _cell_int(row, c, defaults[f]) for f, c in zip(BREAKDOWN_FIELDS, cols)
-        }
-    return {f: _cell_int(row, c, defaults) for f, c in zip(BREAKDOWN_FIELDS, cols)}
+    return {f: _cell_int(row, c, fill) for f, c in zip(BREAKDOWN_FIELDS, cols)}
+
+
+def breakdown_inheriting(row, cols: tuple, fallbacks: dict) -> dict:
+    """Read the six hour-breakdown fields, inheriting per-field fallbacks.
+
+    Used for a selective continuation row, whose numeric cells are vertically
+    merged with the slot's first row: a None cell inherits the slot's value.
+    """
+    return {f: _cell_int(row, c, fallbacks[f]) for f, c in zip(BREAKDOWN_FIELDS, cols)}
+
+
+def _append_alternative(
+    slot: SelectiveSlot, code_str: str, name_str: str, breakdown: dict
+) -> None:
+    """Append an Alternative to the slot, skipping fully blank continuation rows."""
+    if code_str or name_str:
+        slot.alternatives.append(Alternative(code=code_str, name=name_str, **breakdown))
 
 
 def parse_selective_courses(
@@ -428,28 +442,23 @@ def parse_selective_courses(
             current = SelectiveSlot(
                 num=num_str,
                 hours=_to_int(hours_raw),
-                semester_credits=_extract_semester_credits(row, semester_map),
-                semester_weekly_hours=_extract_semester_credits(row, weekly_map),
+                semester_credits=map_semester_values(row, semester_map),
+                semester_weekly_hours=map_semester_values(row, weekly_map),
             )
             slots.append(current)
             _warn_credit_mismatch(current)
-            # The slot row's breakdown is the default for every alternative;
-            # continuation rows inherit it where their cells are merged (None).
-            slot_breakdown = _breakdown(row, layout.breakdown, 0)
-            if code_str or name_str:
-                current.alternatives.append(
-                    Alternative(code=code_str, name=name_str, **slot_breakdown)
-                )
+            # The slot row's breakdown is the default every continuation row
+            # inherits where its cells are merged (None).
+            slot_breakdown = breakdown_from(row, layout.breakdown, 0)
+            _append_alternative(current, code_str, name_str, slot_breakdown)
 
         elif current is not None and num_str is None:
-            if code_str or name_str:
-                current.alternatives.append(
-                    Alternative(
-                        code=code_str,
-                        name=name_str,
-                        **_breakdown(row, layout.breakdown, slot_breakdown),
-                    )
-                )
+            _append_alternative(
+                current,
+                code_str,
+                name_str,
+                breakdown_inheriting(row, layout.breakdown, slot_breakdown),
+            )
 
     if not slots:
         print("WARNING: no selective courses found")
@@ -477,9 +486,9 @@ def parse_core_courses(
             code=str(code).strip() if code else "",
             name=_clean_name(name),
             hours=_to_int(hours_raw),
-            **_breakdown(row, layout.breakdown, 0),
-            semester_credits=_extract_semester_credits(row, semester_map),
-            semester_weekly_hours=_extract_semester_credits(row, weekly_map),
+            **breakdown_from(row, layout.breakdown, 0),
+            semester_credits=map_semester_values(row, semester_map),
+            semester_weekly_hours=map_semester_values(row, weekly_map),
         )
         _warn_credit_mismatch(course)
         courses.append(course)

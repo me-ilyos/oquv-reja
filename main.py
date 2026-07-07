@@ -5,18 +5,43 @@ import openpyxl
 
 from formatter import build_markdown
 from parser import (
-    detect_columns,
+    detect_sheet_layout,
     extract_start_year,
     find_cell_containing,
     parse_core_courses,
-    parse_label_value,
     parse_selective_courses,
     resolve_direction,
-    to_camel_case,
+    to_pascal_case,
+    value_after_dash,
 )
 
 SOURCES_DIR = Path("sources")
 OUTPUT_DIR = Path("output")
+
+
+def read_metadata(ws) -> tuple[str, str, str]:
+    """Return (degree, duration, edu_type) from the metadata region, each the
+    text after the label's ' - ' or '' when its cell is absent."""
+    degree_cell = find_cell_containing(ws, "Akademik daraja")
+    duration_cell = find_cell_containing(ws, "muddati")
+    edu_type_cell = find_cell_containing(ws, "shakli")
+    degree = value_after_dash(degree_cell.value) if degree_cell else ""
+    duration = value_after_dash(duration_cell.value) if duration_cell else ""
+    edu_type = value_after_dash(edu_type_cell.value) if edu_type_cell else ""
+    return degree, duration, edu_type
+
+
+def output_stem(
+    xlsx_path: Path, direction: tuple[str, str] | None, start_year: str
+) -> str:
+    """Build the output filename stem from the program direction (falling back
+    to the source filename), suffixed with the start year when known."""
+    if direction is not None:
+        code, name = direction
+        stem = f"{to_pascal_case(name)}_{code}" if code else to_pascal_case(name)
+    else:
+        stem = xlsx_path.stem
+    return f"{stem}_{start_year}" if start_year else stem
 
 
 def process_file(xlsx_path: Path) -> None:
@@ -24,35 +49,20 @@ def process_file(xlsx_path: Path) -> None:
     ws = wb.active
 
     direction = resolve_direction(ws)
-    if direction is not None:
-        code, name = direction
-        stem = f"{to_camel_case(name)}_{code}" if code else to_camel_case(name)
-        title = name
-    else:
-        stem = xlsx_path.stem
-        title = xlsx_path.stem
+    title = direction[1] if direction is not None else xlsx_path.stem
 
     year_cell = find_cell_containing(ws, "quv yili")
-
     year_raw = year_cell.value if year_cell else None
     start_year = extract_start_year(year_raw) if year_raw else ""
 
-    degree_cell = find_cell_containing(ws, "Akademik daraja")
-    duration_cell = find_cell_containing(ws, "muddati")
-    edu_type_cell = find_cell_containing(ws, "shakli")
+    degree, duration, edu_type = read_metadata(ws)
 
-    degree = parse_label_value(degree_cell.value) if degree_cell else ""
-    duration = parse_label_value(duration_cell.value) if duration_cell else ""
-    edu_type = parse_label_value(edu_type_cell.value) if edu_type_cell else ""
-
-    layout, semester_map, weekly_map = detect_columns(ws)
+    layout, semester_map, weekly_map = detect_sheet_layout(ws)
     core_courses = parse_core_courses(ws, layout, semester_map, weekly_map)
     selective_slots = parse_selective_courses(ws, layout, semester_map, weekly_map)
 
     OUTPUT_DIR.mkdir(exist_ok=True)
-    if start_year:
-        stem = f"{stem}_{start_year}"
-    out_path = OUTPUT_DIR / (stem + ".md")
+    out_path = OUTPUT_DIR / (output_stem(xlsx_path, direction, start_year) + ".md")
     out_path.write_text(
         build_markdown(
             title, start_year, degree, duration, edu_type, core_courses, selective_slots
