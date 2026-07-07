@@ -5,3 +5,6 @@ sources/
 __pycache__/
 .ruff_cache/
 *.png
+db.sqlite3
+media/
+staticfiles/

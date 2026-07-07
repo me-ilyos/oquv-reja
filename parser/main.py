@@ -2,8 +2,8 @@ import argparse
 from pathlib import Path
 
 import openpyxl
-
 from formatter import build_markdown
+
 from parser import (
     detect_sheet_layout,
     extract_start_year,

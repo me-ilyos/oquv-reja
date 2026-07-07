@@ -5,12 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Parse all files in sources/
-python main.py
+# Parse all files in sources/ (parser CLI lives in parser/)
+python parser/main.py
 
 # Parse specific file(s)
-python main.py sources/mmt_23.xlsx
-python main.py sources/mmt_23.xlsx sources/60110100_ppd.xlsx
+python parser/main.py sources/mmt_23.xlsx
+python parser/main.py sources/mmt_23.xlsx sources/60110100_ppd.xlsx
 
 # Install dependencies
 pip install -r requirements.txt
