@@ -5,12 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Parse all files in sources/ (parser CLI lives in parser/)
-python parser/main.py
+# Parse all files in sources/ (parser is a package; run as a module)
+python -m parser.main
 
 # Parse specific file(s)
-python parser/main.py sources/mmt_23.xlsx
-python parser/main.py sources/mmt_23.xlsx sources/60110100_ppd.xlsx
+python -m parser.main sources/mmt_23.xlsx
+python -m parser.main sources/mmt_23.xlsx sources/60110100_ppd.xlsx
+
+# Import parsed curricula into the Django DB
+python manage.py import_reja sources/mmt_23.xlsx
+python manage.py import_reja sources/mmt_23.xlsx --replace
 
 # Install dependencies
 pip install -r requirements.txt

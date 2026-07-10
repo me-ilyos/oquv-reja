@@ -1,4 +1,4 @@
-from models import Course, SelectiveSlot
+from parser.models import Course, SelectiveSlot
 
 
 def fmt_num(value) -> str:

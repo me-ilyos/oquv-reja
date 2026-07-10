@@ -1,6 +1,6 @@
 import re
 
-from models import Alternative, ColumnLayout, Course, SelectiveSlot
+from parser.models import Alternative, ColumnLayout, Course, SelectiveSlot
 
 COURSE_NUM_RE = re.compile(r"^\d+\.\d+(\.\d+)?$")
 
@@ -64,6 +64,18 @@ def to_pascal_case(name: str) -> str:
 def extract_start_year(raw: str) -> str:
     match = re.search(r"(\d{4})/\d{4}", raw)
     return match.group(1) if match else ""
+
+
+def read_metadata(ws) -> tuple[str, str, str]:
+    """Return (degree, duration, edu_type) from the metadata region, each the
+    text after the label's ' - ' or '' when its cell is absent."""
+    degree_cell = find_cell_containing(ws, "Akademik daraja")
+    duration_cell = find_cell_containing(ws, "muddati")
+    edu_type_cell = find_cell_containing(ws, "shakli")
+    degree = value_after_dash(degree_cell.value) if degree_cell else ""
+    duration = value_after_dash(duration_cell.value) if duration_cell else ""
+    edu_type = value_after_dash(edu_type_cell.value) if edu_type_cell else ""
+    return degree, duration, edu_type
 
 
 def find_header_col(ws, keyword: str, max_row: int):

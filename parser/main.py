@@ -2,33 +2,21 @@ import argparse
 from pathlib import Path
 
 import openpyxl
-from formatter import build_markdown
 
-from parser import (
+from parser.formatter import build_markdown
+from parser.parser import (
     detect_sheet_layout,
     extract_start_year,
     find_cell_containing,
     parse_core_courses,
     parse_selective_courses,
+    read_metadata,
     resolve_direction,
     to_pascal_case,
-    value_after_dash,
 )
 
 SOURCES_DIR = Path("sources")
 OUTPUT_DIR = Path("output")
-
-
-def read_metadata(ws) -> tuple[str, str, str]:
-    """Return (degree, duration, edu_type) from the metadata region, each the
-    text after the label's ' - ' or '' when its cell is absent."""
-    degree_cell = find_cell_containing(ws, "Akademik daraja")
-    duration_cell = find_cell_containing(ws, "muddati")
-    edu_type_cell = find_cell_containing(ws, "shakli")
-    degree = value_after_dash(degree_cell.value) if degree_cell else ""
-    duration = value_after_dash(duration_cell.value) if duration_cell else ""
-    edu_type = value_after_dash(edu_type_cell.value) if edu_type_cell else ""
-    return degree, duration, edu_type
 
 
 def output_stem(
