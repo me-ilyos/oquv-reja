@@ -58,3 +58,10 @@ class DepartmentAdmin(admin.ModelAdmin):
 @admin.register(OqituvchiProfil)
 class OqituvchiProfilAdmin(admin.ModelAdmin):
     list_display = ("foydalanuvchi", "kafedra", "turi")
+    list_filter = ("kafedra", "turi")
+    # Required for autocomplete_fields pointing here (plans.Yuklama.oqituvchi).
+    search_fields = (
+        "foydalanuvchi__first_name",
+        "foydalanuvchi__last_name",
+        "foydalanuvchi__telefon",
+    )
