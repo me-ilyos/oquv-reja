@@ -36,6 +36,8 @@ choice conflict, ruff wins — don't use # fmt: skip to preserve alignment.
 - **Python 3.10+** (uses lowercase `tuple[...]` type hints)
 - **openpyxl** — reads `.xlsx` files with `data_only=True` (formulas resolve to cached values)
 - **Standard library only** otherwise (`re`, `pathlib`)
+- **Django** for the backend
+- **Frontend** - template files with HTML, CSS. For working with tables and dynamic actions HTMX and Alpine JS
 
 ## Architecture rules
 - One module = one responsibility. New concern → new file, not a new section
