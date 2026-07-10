@@ -132,6 +132,24 @@ class ImportRejaTest(TestCase):
         self.assertFalse(semestrlar.get(semestr=5).kurs_ishi_bor)
         self.assertTrue(semestrlar.get(semestr=6).kurs_ishi_bor)
 
+    def test_takroriy_raqam_noyoblashtiriladi(self) -> None:
+        # Real sheets occasionally repeat a course number by mistake (three
+        # unrelated courses all numbered "1.06" in one XM.xlsx row block).
+        birinchi = make_course(num="1.06", code="IKXT1-420", name="Ikkinchi til")
+        ikkinchi = make_course(num="1.06", code="AShT1730", name="Sharq tili")
+        uchinchi = make_course(num="1.06", code="HMFKI106", name="XM kirish")
+        natija = import_reja(make_parsed(core=[birinchi, ikkinchi, uchinchi]))
+        raqamlar = sorted(natija.reja.fanlar.values_list("raqam", flat=True))
+        self.assertEqual(raqamlar, ["1.06", "1.06.2", "1.06.3"])
+        self.assertEqual(
+            {f.tanlangan_variant.kodi for f in natija.reja.fanlar.all()},
+            {"IKXT1-420", "AShT1730", "HMFKI106"},
+        )
+        self.assertTrue(
+            any("takroriy raqam" in o for o in natija.ogohlantirishlar),
+            natija.ogohlantirishlar,
+        )
+
     def test_taqsimotsiz_fan_ogohlantiradi(self) -> None:
         kurs = make_course(semester_credits={}, semester_weekly_hours={})
         natija = import_reja(make_parsed(core=[kurs]))

@@ -147,9 +147,28 @@ def _rejani_tayyorlash(
     return reja, False, holat
 
 
+def _noyob_raqam(reja: OquvReja, raqam: str) -> tuple[str, str | None]:
+    """Disambiguate a raqam that the sheet repeats by mistake.
+
+    Ministry sheets occasionally number two or three unrelated courses with
+    the same value (a copy-paste slip, not a merged cell). Losing or
+    overwriting that data is worse than a suffixed number, so we append an
+    ordinal and warn instead of letting the DB's uniqueness constraint crash
+    the import.
+    """
+    if not Fan.objects.filter(reja=reja, raqam=raqam).exists():
+        return raqam, None
+    n = 2
+    while Fan.objects.filter(reja=reja, raqam=f"{raqam}.{n}").exists():
+        n += 1
+    yangi = f"{raqam}.{n}"
+    return yangi, f"{raqam}: varaqda takroriy raqam; {yangi} sifatida saqlandi"
+
+
 def _majburiy_fan_yaratish(reja: OquvReja, course: Course) -> list[str]:
+    raqam, raqam_ogohlantirishi = _noyob_raqam(reja, course.num)
     fan = Fan.objects.create(
-        reja=reja, raqam=course.num, turi=FanTuri.MAJBURIY, jami_soat=course.hours
+        reja=reja, raqam=raqam, turi=FanTuri.MAJBURIY, jami_soat=course.hours
     )
     variant = _variant_yaratish(fan, course.code, course.name, course)
     ogohlantirishlar = _variant_semestrlari(
@@ -157,13 +176,23 @@ def _majburiy_fan_yaratish(reja: OquvReja, course: Course) -> list[str]:
     )
     fan.tanlangan_variant = variant
     fan.save(update_fields=["tanlangan_variant"])
-    return [f"{fan.raqam} {course.name}: {o}" for o in ogohlantirishlar]
+    natija = [f"{fan.raqam} {course.name}: {o}" for o in ogohlantirishlar]
+    if raqam_ogohlantirishi:
+        natija.insert(0, raqam_ogohlantirishi)
+    return natija
 
 
 def _tanlov_fan_yaratish(reja: OquvReja, slot: SelectiveSlot) -> list[str]:
+    raqam, raqam_ogohlantirishi = _noyob_raqam(reja, slot.num)
     fan = Fan.objects.create(
-        reja=reja, raqam=slot.num, turi=FanTuri.TANLOV, jami_soat=slot.hours
+        reja=reja, raqam=raqam, turi=FanTuri.TANLOV, jami_soat=slot.hours
     )
+    if raqam_ogohlantirishi:
+        return [raqam_ogohlantirishi] + _tanlov_variantlarini_yaratish(fan, slot)
+    return _tanlov_variantlarini_yaratish(fan, slot)
+
+
+def _tanlov_variantlarini_yaratish(fan: Fan, slot: SelectiveSlot) -> list[str]:
     ogohlantirishlar: list[str] = []
     if not slot.alternatives:
         return [f"{fan.raqam}: tanlov slotida variantlar topilmadi"]
