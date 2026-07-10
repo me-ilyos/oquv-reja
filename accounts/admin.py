@@ -1,0 +1,60 @@
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+
+from accounts.models import Department, Foydalanuvchi, OqituvchiProfil, OqituvchiTuri
+
+
+@admin.register(Foydalanuvchi)
+class FoydalanuvchiAdmin(UserAdmin):
+    model = Foydalanuvchi
+    ordering = ("telefon",)
+    list_display = ("telefon", "first_name", "last_name", "rol", "is_staff")
+    search_fields = ("telefon", "first_name", "last_name")
+    fieldsets = (
+        (None, {"fields": ("telefon", "password")}),
+        ("Shaxsiy ma'lumot", {"fields": ("first_name", "last_name")}),
+        (
+            "Ruxsatlar",
+            {
+                "fields": (
+                    "rol",
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                )
+            },
+        ),
+    )
+    add_fieldsets = (
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": (
+                    "telefon",
+                    "first_name",
+                    "last_name",
+                    "rol",
+                    "password1",
+                    "password2",
+                ),
+            },
+        ),
+    )
+
+
+@admin.register(OqituvchiTuri)
+class OqituvchiTuriAdmin(admin.ModelAdmin):
+    list_display = ("nomi", "min_soat")
+
+
+@admin.register(Department)
+class DepartmentAdmin(admin.ModelAdmin):
+    list_display = ("nomi", "mudir")
+
+
+@admin.register(OqituvchiProfil)
+class OqituvchiProfilAdmin(admin.ModelAdmin):
+    list_display = ("foydalanuvchi", "kafedra", "turi")
