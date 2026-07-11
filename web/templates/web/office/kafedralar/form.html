@@ -1,0 +1,17 @@
+{% extends "web/base.html" %}
+{% block title %}Kafedra{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="title">{% if form.instance.pk %}{{ form.instance.nomi }}{% else %}Yangi kafedra{% endif %}</div>
+  </div>
+</div>
+<div class="card">
+  <form method="post">
+    {% csrf_token %}
+    {% include "web/parts/_form_maydonlari.html" %}
+    <button type="submit" class="btn btn-primary">Saqlash</button>
+    <a class="btn" href="{% url 'office:kafedra_list' %}">Bekor qilish</a>
+  </form>
+</div>
+{% endblock %}

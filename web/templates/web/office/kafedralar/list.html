@@ -1,0 +1,89 @@
+{% extends "web/base.html" %}
+{% load ui %}
+{% block title %}Kafedralar{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="title">Kafedralar</div>
+    <div class="subtitle">Biriktirilgan soatlar, o'qituvchi qamrovi va mudirlar — {{ yil }}/{{ yil|add:1 }}</div>
+  </div>
+  <div class="controls">
+    {% if yillar %}
+    <form method="get">
+      <select name="yil" onchange="this.form.submit()">
+        {% for y in yillar %}
+        <option value="{{ y }}" {% if y == yil %}selected{% endif %}>{{ y }}/{{ y|add:1 }} o'quv yili</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+    <a class="btn btn-primary" href="{% url 'office:kafedra_yangi' %}">+ Yangi kafedra</a>
+  </div>
+</div>
+<div class="table-wrap narrow">
+  <table>
+    <thead>
+      <tr>
+        <th>Kafedra</th>
+        <th>Mudir</th>
+        <th>O'qituvchilar</th>
+        <th>Biriktirilgan soat</th>
+        <th>Taqsimlangan soat</th>
+        <th style="min-width:120px;">Qamrov</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for q in qamrovlar %}
+      <tr>
+        <td><strong>{{ q.kafedra.nomi }}</strong></td>
+        <td class="assign-cell cell-relative" x-data="{ ochiq: false }" @click.outside="ochiq = false">
+          {% if q.kafedra.mudir %}
+          <button type="button" class="teacher-chip" @click="ochiq = !ochiq">
+            <span class="avatar">{{ q.kafedra.mudir|stringformat:"s"|bosh_harflar }}</span>{{ q.kafedra.mudir }}
+          </button>
+          {% else %}
+          <button type="button" class="teacher-chip empty" @click="ochiq = !ochiq">+ Mudir tayinlash</button>
+          {% endif %}
+          <div class="popover" x-show="ochiq" x-cloak>
+            {% for profil in q.kafedra.oqituvchilar.all %}
+            <form method="post" action="{% url 'office:kafedra_mudir' q.kafedra.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="profil" value="{{ profil.pk }}">
+              <button type="submit" class="opt"><span class="avatar">{{ profil|stringformat:"s"|bosh_harflar }}</span>{{ profil }}</button>
+            </form>
+            {% empty %}
+            <div class="hint" style="padding:6px 8px;">Kafedrada o'qituvchi yo'q</div>
+            {% endfor %}
+            {% if q.kafedra.mudir %}
+            <form method="post" action="{% url 'office:kafedra_mudir' q.kafedra.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="profil" value="">
+              <button type="submit" class="opt clear">Mudirni bekor qilish</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+        <td>{{ q.oqituvchilar_soni }}</td>
+        <td>{{ q.biriktirilgan_soat }}</td>
+        <td>{{ q.taqsimlangan_soat }}</td>
+        <td>
+          {% with f=q.taqsimlangan_soat|foiz:q.biriktirilgan_soat %}
+          <div class="progress" title="{{ f }}%"><div class="fill {% if f < 100 %}warn{% endif %}" style="width:{{ f }}%;"></div></div>
+          {% endwith %}
+        </td>
+        <td style="white-space:nowrap;">
+          <a class="btn" href="{% url 'office:kafedra_tahrir' q.kafedra.pk %}">Tahrirlash</a>
+          <form method="post" action="{% url 'office:kafedra_ochirish' q.kafedra.pk %}" style="display:inline" onsubmit="return confirm('{{ q.kafedra.nomi }} kafedrasini o\'chirasizmi?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">O'chirish</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7"><div class="empty-state">Kafedralar hali yaratilmagan.</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

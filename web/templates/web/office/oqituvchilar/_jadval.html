@@ -1,0 +1,51 @@
+{% load ui %}
+<div class="table-wrap narrow">
+  <table>
+    <thead>
+      <tr>
+        <th>F.I.Sh</th>
+        <th>Telefon</th>
+        <th>Kafedra</th>
+        <th>Lavozim</th>
+        <th>Minimal soat</th>
+        <th>Yuklama soat</th>
+        <th style="min-width:120px;">Qamrov</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for holat in holatlar %}
+      <tr>
+        <td>
+          <span class="teacher-chip" style="cursor:default;">
+            <span class="avatar">{{ holat.oqituvchi|stringformat:"s"|bosh_harflar }}</span>
+            {{ holat.oqituvchi }}
+            {% if not holat.oqituvchi.foydalanuvchi.is_active %}<span class="tag tag-elec">FAOL EMAS</span>{% endif %}
+          </span>
+        </td>
+        <td><span class="code">{{ holat.oqituvchi.foydalanuvchi.telefon }}</span></td>
+        <td>{{ holat.oqituvchi.kafedra.nomi }}</td>
+        <td>{{ holat.oqituvchi.turi.nomi }}</td>
+        <td>{{ holat.min_soat }}</td>
+        <td>{{ holat.jami_soat }}</td>
+        <td>
+          {% with f=holat.jami_soat|foiz:holat.min_soat %}
+          <div class="progress" title="{{ f }}% ({% if holat.kamomad %}kamomad {{ holat.kamomad }} soat{% else %}to'ldi{% endif %})">
+            <div class="fill {% if holat.kamomad %}warn{% endif %}" style="width:{{ f }}%;"></div>
+          </div>
+          {% endwith %}
+        </td>
+        <td style="white-space:nowrap;">
+          <a class="btn" href="{% url 'office:oqituvchi_tahrir' holat.oqituvchi.pk %}">Tahrirlash</a>
+          <form method="post" action="{% url 'office:oqituvchi_ochirish' holat.oqituvchi.pk %}" style="display:inline" onsubmit="return confirm('O\'qituvchini o\'chirasizmi?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">O'chirish</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8"><div class="empty-state">O'qituvchilar topilmadi.</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
