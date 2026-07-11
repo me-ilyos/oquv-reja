@@ -1,0 +1,105 @@
+from django.test import TestCase
+from django.urls import reverse
+
+from accounts.models import Department
+from plans.dashboard import joriy_akademik_yil
+from plans.models import FanTuri
+from plans.tests.factories import make_fan, make_fan_semestr, make_reja
+from web.tests.helpers import login, office_admin_yarat, oqituvchi_yarat
+
+
+class DashboardKorinishTests(TestCase):
+    def setUp(self) -> None:
+        self.joriy = joriy_akademik_yil()
+        self.reja = make_reja(boshlanish_yili=self.joriy)
+        self.kafedra = Department.objects.create(nomi="Tarix kafedrasi")
+        login(self.client, office_admin_yarat())
+
+    def test_oqituvchi_kira_olmaydi(self) -> None:
+        login(self.client, oqituvchi_yarat())
+        javob = self.client.get(reverse("office:dashboard"))
+        self.assertRedirects(javob, reverse("bosh_sahifa"), target_status_code=302)
+
+    def test_biriktirilmagan_fan_belgilanadi(self) -> None:
+        fan = make_fan(self.reja)
+        make_fan_semestr(fan.tanlangan_variant, semestr=1)
+        javob = self.client.get(reverse("office:dashboard"))
+        self.assertContains(javob, "qator-biriktirilmagan")
+        self.assertContains(javob, "Kafedra biriktirish")
+
+    def test_notogri_yil_joriyga_qaytadi(self) -> None:
+        fan = make_fan(self.reja)
+        make_fan_semestr(fan.tanlangan_variant, semestr=1)
+        javob = self.client.get(reverse("office:dashboard"), {"yil": "1999"})
+        self.assertEqual(javob.context["yil"], self.joriy)
+
+    def test_reja_yoq_bolsa_bosh_holat(self) -> None:
+        javob = self.client.get(reverse("office:dashboard"))
+        self.assertContains(javob, "reja topilmadi")
+
+    def test_htmx_sorovi_partial_qaytaradi(self) -> None:
+        fan = make_fan(self.reja)
+        make_fan_semestr(fan.tanlangan_variant, semestr=1)
+        javob = self.client.get(reverse("office:dashboard"), HTTP_HX_REQUEST="true")
+        self.assertNotContains(javob, "<html")
+        self.assertContains(javob, 'id="statlar"')
+
+
+class KafedraBiriktirishTests(TestCase):
+    def setUp(self) -> None:
+        self.joriy = joriy_akademik_yil()
+        self.reja = make_reja(boshlanish_yili=self.joriy)
+        self.kafedra = Department.objects.create(nomi="Tarix kafedrasi")
+        self.fan = make_fan(self.reja)
+        make_fan_semestr(self.fan.tanlangan_variant, semestr=1)
+        login(self.client, office_admin_yarat())
+
+    def test_kafedra_biriktiriladi_va_statlar_yangilanadi(self) -> None:
+        variant = self.fan.tanlangan_variant
+        javob = self.client.post(
+            reverse("office:kafedra_biriktirish", args=[variant.pk]),
+            {"kafedra": self.kafedra.pk, "yil": self.joriy},
+        )
+        variant.refresh_from_db()
+        self.assertEqual(variant.kafedra, self.kafedra)
+        self.assertContains(javob, 'hx-swap-oob="true"')
+        self.assertContains(javob, "Tarix kafedrasi")
+
+    def test_bekor_qilish(self) -> None:
+        variant = self.fan.tanlangan_variant
+        variant.kafedra = self.kafedra
+        variant.save(update_fields=["kafedra"])
+        self.client.post(
+            reverse("office:kafedra_biriktirish", args=[variant.pk]),
+            {"kafedra": "", "yil": self.joriy},
+        )
+        variant.refresh_from_db()
+        self.assertIsNone(variant.kafedra)
+
+
+class VariantTanlashTests(TestCase):
+    def setUp(self) -> None:
+        self.joriy = joriy_akademik_yil()
+        self.reja = make_reja(boshlanish_yili=self.joriy)
+        login(self.client, office_admin_yarat())
+
+    def test_tanlov_varianti_tanlanadi(self) -> None:
+        fan = make_fan(self.reja, raqam="2.01", turi=FanTuri.TANLOV)
+        variant = fan.variantlar.first()
+        make_fan_semestr(variant, semestr=1)
+        javob = self.client.post(
+            reverse("office:variant_tanlash", args=[fan.pk]),
+            {"variant": variant.pk, "yil": self.joriy},
+        )
+        fan.refresh_from_db()
+        self.assertEqual(fan.tanlangan_variant, variant)
+        self.assertEqual(javob.status_code, 200)
+
+    def test_majburiy_fanda_xato_korsatiladi(self) -> None:
+        fan = make_fan(self.reja)
+        make_fan_semestr(fan.tanlangan_variant, semestr=1)
+        javob = self.client.post(
+            reverse("office:variant_tanlash", args=[fan.pk]),
+            {"variant": fan.tanlangan_variant.pk, "yil": self.joriy},
+        )
+        self.assertContains(javob, "Faqat tanlov fanlari uchun")

@@ -7,6 +7,7 @@ from plans.services import (
     fan_semestr_talabi,
     guruhlarni_sinxronlash,
     kafedra_taqsimoti,
+    kafedraga_biriktirish,
     oqituvchi_yillik_yuklamasi,
     taqsimot_hisoboti,
     variantni_tanlash,
@@ -207,3 +208,32 @@ class VariantniTanlashTest(TestCase):
         begona = make_fan(reja, raqam="1.05")
         with self.assertRaises(ValidationError):
             variantni_tanlash(tanlov, begona.tanlangan_variant)
+
+
+class KafedragaBiriktirishTest(TestCase):
+    def setUp(self) -> None:
+        self.reja = make_reja()
+        self.kafedra = Department.objects.create(nomi="Matematika")
+
+    def test_kafedra_ornatiladi(self) -> None:
+        fan = make_fan(self.reja)
+        kafedraga_biriktirish(fan.tanlangan_variant, self.kafedra)
+        fan.tanlangan_variant.refresh_from_db()
+        self.assertEqual(fan.tanlangan_variant.kafedra, self.kafedra)
+
+    def test_tanlanmagan_variant_rad_etiladi(self) -> None:
+        fan = make_fan(self.reja, raqam="2.01", turi=FanTuri.TANLOV)
+        with self.assertRaises(ValidationError):
+            kafedraga_biriktirish(fan.variantlar.first(), self.kafedra)
+
+    def test_yuklamali_variantdan_kafedra_olib_tashlanmaydi(self) -> None:
+        fan = make_fan(self.reja, kafedra=self.kafedra)
+        fs = make_fan_semestr(fan.tanlangan_variant)
+        oqituvchi = make_oqituvchi(kafedra=self.kafedra)
+        Yuklama.objects.create(fan_semestr=fs, tur=SoatTuri.MARUZA, oqituvchi=oqituvchi)
+        with self.assertRaises(ValidationError):
+            kafedraga_biriktirish(fan.tanlangan_variant, None)
+        with self.assertRaises(ValidationError):
+            kafedraga_biriktirish(
+                fan.tanlangan_variant, Department.objects.create(nomi="Boshqa")
+            )

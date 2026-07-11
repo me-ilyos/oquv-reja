@@ -1,13 +1,13 @@
 from django.urls import path
-from django.views.generic import TemplateView
 
-from web.mixins import OfficeAdminTalabMixin
-
-
-class PlaceholderView(OfficeAdminTalabMixin, TemplateView):
-    template_name = "web/parts/tez_orada.html"
-
+from web.views.office.dashboard import (
+    DashboardView,
+    kafedra_biriktirish,
+    variant_tanlash,
+)
 
 urlpatterns = [
-    path("", PlaceholderView.as_view(), name="dashboard"),
+    path("", DashboardView.as_view(), name="dashboard"),
+    path("fan/<int:pk>/variant/", variant_tanlash, name="variant_tanlash"),
+    path("variant/<int:pk>/kafedra/", kafedra_biriktirish, name="kafedra_biriktirish"),
 ]

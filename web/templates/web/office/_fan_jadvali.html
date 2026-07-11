@@ -1,0 +1,36 @@
+<div x-data="{ qidiruv: '', faqat: false }">
+  <div class="controls" style="margin-bottom:10px;">
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" placeholder="Fan nomi yoki kodi" x-model="qidiruv">
+    </div>
+    <button type="button" class="chip-btn" :class="faqat && 'active'" @click="faqat = !faqat">Faqat biriktirilmagan</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-idx">№</th>
+          <th class="col-code">Kod</th>
+          <th class="col-name">Fan</th>
+          <th>Yo'nalish</th>
+          <th class="sem-h">Ma'ruza</th>
+          <th class="sem-h">Amaliyot</th>
+          <th class="sem-h">Lab.</th>
+          <th class="sem-h">Seminar</th>
+          <th class="sem-h">Kurs ishi</th>
+          <th>Jami</th>
+          <th>Taqsimlangan</th>
+          <th class="assign-cell">Kafedra</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for satr in fan_satrlari %}
+        {% include "web/office/_fan_qatori.html" %}
+        {% empty %}
+        <tr><td colspan="12"><div class="empty-state">Bu o'quv yilida fanlar topilmadi.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

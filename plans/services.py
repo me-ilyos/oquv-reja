@@ -110,9 +110,14 @@ def kafedra_taqsimoti(kafedra: Department, akademik_yil: int) -> list[TalabSatri
     return _talab_satrlari(semestrlar)
 
 
+def ofis_taqsimoti(akademik_yil: int) -> list[TalabSatri]:
+    """Institution-wide demand vs allocation for one academic year."""
+    return _talab_satrlari(FanSemestr.objects.effektiv().akademik_yilda(akademik_yil))
+
+
 def _talab_satrlari(semestrlar: FanSemestrQuerySet) -> list[TalabSatri]:
     semestrlar = semestrlar.select_related("variant__fan__reja")
-    taqsimlangan = _taqsimlangan_soatlar(semestrlar)
+    taqsimlangan = taqsimlangan_soatlar(semestrlar)
     return [
         TalabSatri(
             fan_semestr=fs,
@@ -125,9 +130,10 @@ def _talab_satrlari(semestrlar: FanSemestrQuerySet) -> list[TalabSatri]:
     ]
 
 
-def _taqsimlangan_soatlar(
+def taqsimlangan_soatlar(
     semestrlar: FanSemestrQuerySet,
 ) -> dict[tuple[int, str], int]:
+    """Allocated hours grouped by (fan_semestr, tur); reused by dashboards."""
     qatorlar = (
         Yuklama.objects.filter(fan_semestr__in=semestrlar)
         .values("fan_semestr_id", "tur")
@@ -174,3 +180,15 @@ def variantni_tanlash(fan: Fan, variant: FanVariant) -> None:
         raise ValidationError("Variant boshqa fanga tegishli.")
     fan.tanlangan_variant = variant
     fan.save(update_fields=["tanlangan_variant"])
+
+
+def kafedraga_biriktirish(variant: FanVariant, kafedra: Department | None) -> None:
+    """Office head delegates (or re-delegates) a course to a department."""
+    if variant.fan.tanlangan_variant_id != variant.pk:
+        raise ValidationError("Avval fan variantini tanlang.")
+    if variant.kafedra_id is not None and kafedra != variant.kafedra:
+        # Moving or clearing the kafedra would orphan its teachers' delegations.
+        if Yuklama.objects.filter(fan_semestr__variant=variant).exists():
+            raise ValidationError("Fanda yuklamalar bor — avval ularni bekor qiling.")
+    variant.kafedra = kafedra
+    variant.save(update_fields=["kafedra"])

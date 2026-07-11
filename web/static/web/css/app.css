@@ -90,6 +90,8 @@ thead .col-code, thead .col-name { background: #f4f2ec; z-index: 4; }
 .popover .opt.clear { color: var(--unassigned); border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; border-radius: 0 0 5px 5px; }
 
 .cell-relative { position: relative; }
+.cell-relative .popover { right: 4px; top: calc(100% - 6px); }
+[x-cloak] { display: none !important; }
 .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
 
 /* --- Components added for the app shell (same idiom as the mockup). --- */
