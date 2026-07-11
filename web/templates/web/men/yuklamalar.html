@@ -1,0 +1,93 @@
+{% extends "web/base.html" %}
+{% load ui %}
+{% block title %}Mening yuklamam{% endblock %}
+{% block content %}
+{% if not profil %}
+<div class="empty-state">Profil biriktirilmagan — ofis administratoriga murojaat qiling.</div>
+{% else %}
+<div class="topbar">
+  <div>
+    <div class="title"><span class="badge-major">{{ profil.kafedra.nomi }}</span>Mening yuklamam</div>
+    <div class="subtitle">{{ profil }} · {{ profil.turi.nomi }} · {{ yil }}/{{ yil|add:1 }} o'quv yili</div>
+  </div>
+  <div class="controls">
+    {% if yillar %}
+    <form method="get">
+      <select name="yil" onchange="this.form.submit()">
+        {% for y in yillar %}
+        <option value="{{ y }}" {% if y == yil %}selected{% endif %}>{{ y }}/{{ y|add:1 }} o'quv yili</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="num">{{ jami_soat }}</div><div class="lbl">Jami yuklama soat</div></div>
+  <div class="stat"><div class="num">{{ profil.turi.min_soat }}</div><div class="lbl">Minimal norma ({{ profil.turi.nomi }})</div></div>
+  <div class="stat {% if jami_soat < profil.turi.min_soat %}warn{% else %}ok{% endif %}">
+    <div class="num">{{ jami_soat|foiz:profil.turi.min_soat }}%</div>
+    <div class="lbl">Qoplanish
+      <div class="progress" style="margin-top:6px;">
+        {% with f=jami_soat|foiz:profil.turi.min_soat %}
+        <div class="fill {% if f < 100 %}warn{% endif %}" style="width:{{ f }}%;"></div>
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if tur_jami %}
+<div class="legend">
+  {% for nomi, soat in tur_jami %}
+  <span><span class="dot" style="background:var(--accent);"></span>{{ nomi }}: {{ soat }} soat</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="table-wrap narrow">
+  <table>
+    <thead>
+      <tr>
+        <th>Fan</th>
+        <th>Yo'nalish</th>
+        <th>Semestr</th>
+        <th>Mashg'ulot turi</th>
+        <th>Guruh / Talabalar</th>
+        <th>Soat</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for yuklama in yuklamalar %}
+      <tr>
+        <td>
+          <span class="code">{{ yuklama.fan_semestr.variant.kodi|default:"" }}</span>
+          <strong>{{ yuklama.fan_semestr.variant.nomi }}</strong>
+        </td>
+        <td><span class="code">{{ yuklama.fan_semestr.variant.fan.reja.yonalish_kodi }}</span></td>
+        <td>{{ yuklama.fan_semestr.semestr }}-semestr</td>
+        <td>{{ yuklama.get_tur_display }}</td>
+        <td>
+          {% if yuklama.guruh %}{{ yuklama.guruh.nomi }}
+          {% elif yuklama.talabalar_soni %}{{ yuklama.talabalar_soni }} talaba
+          {% else %}Butun oqim{% endif %}
+        </td>
+        <td><strong>{{ yuklama.soat }}</strong></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6"><div class="empty-state">Bu o'quv yilida sizga yuklama taqsimlanmagan.</div></td></tr>
+      {% endfor %}
+    </tbody>
+    {% if yuklamalar %}
+    <tfoot>
+      <tr>
+        <td colspan="5" style="text-align:right;font-weight:600;">Jami:</td>
+        <td><strong>{{ jami_soat }}</strong></td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}
