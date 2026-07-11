@@ -1,0 +1,18 @@
+{% load static %}<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}O'quv yuklamasi{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'web/css/app.css' %}">
+<script src="{% static 'web/js/htmx.min.js' %}" defer></script>
+<script src="{% static 'web/js/alpine.min.js' %}" defer></script>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+{% if user.is_authenticated %}{% include "web/parts/_navbar.html" %}{% endif %}
+<div class="app">
+  {% include "web/parts/_messages.html" %}
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

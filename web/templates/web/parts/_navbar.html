@@ -1,0 +1,18 @@
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a class="brand" href="{% url 'bosh_sahifa' %}">O'quv yuklamasi</a>
+    {% if user.is_office_admin or user.is_superadmin %}
+      <a class="nav-link {% if request.resolver_match.view_name == 'office:dashboard' %}active{% endif %}" href="{% url 'office:dashboard' %}">Boshqaruv paneli</a>
+    {% elif user.is_department_admin %}
+      <a class="nav-link {% if request.resolver_match.view_name == 'kafedra:dashboard' %}active{% endif %}" href="{% url 'kafedra:dashboard' %}">Boshqaruv paneli</a>
+    {% elif user.is_teacher %}
+      <a class="nav-link {% if request.resolver_match.view_name == 'men:yuklamalar' %}active{% endif %}" href="{% url 'men:yuklamalar' %}">Mening yuklamam</a>
+    {% endif %}
+    <span class="spacer"></span>
+    <span class="user">{{ user.get_full_name }}</span>
+    <form method="post" action="{% url 'chiqish' %}">
+      {% csrf_token %}
+      <button type="submit" class="logout-btn">Chiqish</button>
+    </form>
+  </div>
+</nav>

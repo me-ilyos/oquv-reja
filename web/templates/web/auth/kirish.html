@@ -1,0 +1,25 @@
+{% extends "web/base.html" %}
+{% block title %}Kirish — O'quv yuklamasi{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <h1>Tizimga kirish</h1>
+  <form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="form-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="form-field">
+      <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+      {{ form.username }}
+      {{ form.username.errors }}
+    </div>
+    <div class="form-field">
+      <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+      {{ form.password }}
+      {{ form.password.errors }}
+    </div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="btn btn-primary">Kirish</button>
+  </form>
+</div>
+{% endblock %}

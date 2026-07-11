@@ -44,9 +44,14 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "accounts",
     "plans",
+    "web",
 ]
 
 AUTH_USER_MODEL = "accounts.Foydalanuvchi"
+
+LOGIN_URL = "kirish"
+LOGIN_REDIRECT_URL = "bosh_sahifa"
+LOGOUT_REDIRECT_URL = "kirish"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -112,7 +117,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "uz"
 
 TIME_ZONE = "Asia/Tashkent"
 
