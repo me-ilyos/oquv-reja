@@ -1,0 +1,18 @@
+<tr id="fs-qator-{{ satr.fan_semestr.pk }}" {% if oob %}hx-swap-oob="true"{% endif %} class="{% if satr.qoldiq_bor %}qator-biriktirilmagan{% endif %}">
+  <td>
+    <span class="code">{{ satr.fan_semestr.variant.kodi|default:"" }}</span>
+    <strong>{{ satr.fan_semestr.variant.nomi }}</strong>
+    <span class="credits">· {{ satr.fan_semestr.variant.fan.reja.yonalish_kodi }}</span>
+  </td>
+  <td>{{ satr.fan_semestr.semestr }}-semestr</td>
+  {% include "web/kafedra/_tur_katak.html" with tur="MARUZA" %}
+  {% include "web/kafedra/_tur_katak.html" with tur="AMALIYOT" %}
+  {% include "web/kafedra/_tur_katak.html" with tur="LABORATORIYA" %}
+  {% include "web/kafedra/_tur_katak.html" with tur="SEMINAR" %}
+  {% include "web/kafedra/_tur_katak.html" with tur="KURS_ISHI" %}
+  <td>
+    <button type="button" class="btn"
+            hx-get="{% url 'kafedra:taqsimot_panel' satr.fan_semestr.pk %}"
+            hx-target="#panel-{{ satr.fan_semestr.pk }}" hx-swap="innerHTML">Taqsimlash</button>
+  </td>
+</tr>

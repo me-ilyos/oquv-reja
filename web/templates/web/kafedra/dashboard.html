@@ -1,0 +1,51 @@
+{% extends "web/base.html" %}
+{% block title %}{{ kafedra.nomi }} — Boshqaruv paneli{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="title"><span class="badge-major">{{ kafedra.nomi }}</span>Kafedra yuklamasi</div>
+    <div class="subtitle">Biriktirilgan fanlar va o'qituvchilarga taqsimot — {{ yil }}/{{ yil|add:1 }}</div>
+  </div>
+  <div class="controls">
+    {% if yillar %}
+    <form method="get">
+      <select name="yil" onchange="this.form.submit()">
+        {% for y in yillar %}
+        <option value="{{ y }}" {% if y == yil %}selected{% endif %}>{{ y }}/{{ y|add:1 }} o'quv yili</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% include "web/kafedra/_statlar.html" %}
+<div class="legend">
+  <span><span class="dot" style="background:var(--mand);"></span>To'liq taqsimlangan</span>
+  <span><span class="dot" style="background:var(--unassigned-soft);border:1px solid var(--unassigned);"></span>Qoldiq soat bor</span>
+</div>
+<div class="table-wrap narrow">
+  <table>
+    <thead>
+      <tr>
+        <th>Fan</th>
+        <th>Semestr</th>
+        <th class="sem-h">Ma'ruza</th>
+        <th class="sem-h">Amaliyot</th>
+        <th class="sem-h">Lab.</th>
+        <th class="sem-h">Seminar</th>
+        <th class="sem-h">Kurs ishi</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for satr in fs_satrlar %}
+      {% include "web/kafedra/_fs_qatori.html" %}
+      <tr><td colspan="8" style="padding:0;border-bottom:0;"><div id="panel-{{ satr.fan_semestr.pk }}"></div></td></tr>
+      {% empty %}
+      <tr><td colspan="8"><div class="empty-state">Bu o'quv yilida kafedraga biriktirilgan fanlar yo'q.</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="hint">Katakdagi son — taqsimlangan/talab soat. "Taqsimlash" tugmasi orqali soatlarni o'qituvchilarga bo'lib bering.</div>
+{% endblock %}

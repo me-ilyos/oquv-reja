@@ -1,0 +1,15 @@
+{% load ui %}
+{% with t=satr.turlar|kalit:tur %}
+<td class="sem-cell">
+  {% if t %}
+  {% if t.talab_soat == None %}
+  <div class="sem-fill" style="background:var(--unassigned-soft);color:var(--unassigned);" title="Talabalar yoki guruhlar soni kiritilmagan">?</div>
+  {% else %}
+  <div class="sem-fill" {% if t.qoldiq_soat > 0 %}style="background:var(--unassigned-soft);color:var(--unassigned);"{% endif %}
+       title="Taqsimlangan {{ t.taqsimlangan_soat }} / talab {{ t.talab_soat }}">{{ t.taqsimlangan_soat }}/{{ t.talab_soat }}</div>
+  {% endif %}
+  {% else %}
+  <div class="sem-empty"></div>
+  {% endif %}
+</td>
+{% endwith %}

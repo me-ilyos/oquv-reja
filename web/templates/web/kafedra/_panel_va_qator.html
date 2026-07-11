@@ -1,0 +1,6 @@
+{% include "web/kafedra/_panel.html" %}
+{# htmx: oob table rows must be wrapped in <template> to parse outside a table #}
+<template>
+{% include "web/kafedra/_fs_qatori.html" with oob=True %}
+</template>
+{% include "web/kafedra/_statlar.html" with oob=True %}

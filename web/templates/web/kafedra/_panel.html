@@ -1,0 +1,92 @@
+{% load ui %}
+<div class="card" style="margin:8px 0 16px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <h2 style="margin:0;">{{ fs.variant.nomi }} — {{ fs.semestr }}-semestr taqsimoti</h2>
+    <button type="button" class="btn" onclick="document.getElementById('panel-{{ fs.pk }}').innerHTML = ''">Yopish</button>
+  </div>
+  {% if xato %}
+  <div class="form-errors">{{ xato }}</div>
+  {% endif %}
+  {% for holat in holatlar %}
+  <div style="border-top:1px solid var(--line);padding:10px 0;">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+      <strong>{{ holat.tur_nomi }}</strong>
+      <span class="credits">
+        {% if holat.talab_soat == None %}talab noma'lum (soni kiritilmagan)
+        {% else %}taqsimlangan {{ holat.taqsimlangan_soat }} / {{ holat.talab_soat }} soat{% endif %}
+      </span>
+      {% if holat.qoldiq_soat > 0 %}<span class="tag" style="background:var(--unassigned-soft);color:var(--unassigned);">qoldiq {{ holat.qoldiq_soat }} soat</span>{% endif %}
+    </div>
+
+    {% if holat.tur == "MARUZA" %}
+    <div style="max-width:320px;" class="cell-relative" x-data="{ ochiq: false, q: '' }" @click.outside="ochiq = false">
+      {% if holat.maruza_yuklama %}
+      <span class="teacher-chip" style="cursor:default;">
+        <span class="avatar">{{ holat.maruza_yuklama.oqituvchi|stringformat:"s"|bosh_harflar }}</span>
+        {{ holat.maruza_yuklama.oqituvchi }} · {{ holat.maruza_yuklama.soat }} soat
+        <button type="button" class="opt clear" style="margin:0 0 0 auto;padding:0 6px;border:0;"
+                hx-post="{% url 'kafedra:yuklama_ochirish' holat.maruza_yuklama.pk %}"
+                hx-target="#panel-{{ fs.pk }}" hx-swap="innerHTML">✕</button>
+      </span>
+      {% else %}
+      <button type="button" class="teacher-chip empty" @click="ochiq = !ochiq">+ O'qituvchi biriktirish ({{ holat.talab_soat }} soat)</button>
+      {% include "web/kafedra/_oqituvchi_popover.html" with url_nomi="kafedra:maruza_yaratish" vals="" %}
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if holat.guruh_slotlar %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;">
+      {% for slot in holat.guruh_slotlar %}
+      <div class="cell-relative" x-data="{ ochiq: false, q: '' }" @click.outside="ochiq = false">
+        <div class="credits" style="margin-bottom:3px;">{{ slot.guruh.nomi }} · {{ holat.guruh_soat }} soat</div>
+        {% if slot.yuklama %}
+        <span class="teacher-chip" style="cursor:default;">
+          <span class="avatar">{{ slot.yuklama.oqituvchi|stringformat:"s"|bosh_harflar }}</span>
+          {{ slot.yuklama.oqituvchi }}
+          <button type="button" class="opt clear" style="margin:0 0 0 auto;padding:0 6px;border:0;"
+                  hx-post="{% url 'kafedra:yuklama_ochirish' slot.yuklama.pk %}"
+                  hx-target="#panel-{{ fs.pk }}" hx-swap="innerHTML">✕</button>
+        </span>
+        {% else %}
+        <button type="button" class="teacher-chip empty" @click="ochiq = !ochiq">+ O'qituvchi biriktirish</button>
+        {% include "web/kafedra/_oqituvchi_popover.html" with url_nomi="kafedra:guruh_yaratish" slot_guruh=slot.guruh holat_tur=holat.tur %}
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if holat.tur == "KURS_ISHI" %}
+    <div>
+      {% for yuklama in holat.kurs_ishi_yuklamalar %}
+      <span class="teacher-chip" style="cursor:default;max-width:360px;margin-bottom:6px;">
+        <span class="avatar">{{ yuklama.oqituvchi|stringformat:"s"|bosh_harflar }}</span>
+        {{ yuklama.oqituvchi }} · {{ yuklama.talabalar_soni }} talaba · {{ yuklama.soat }} soat
+        <button type="button" class="opt clear" style="margin:0 0 0 auto;padding:0 6px;border:0;"
+                hx-post="{% url 'kafedra:yuklama_ochirish' yuklama.pk %}"
+                hx-target="#panel-{{ fs.pk }}" hx-swap="innerHTML">✕</button>
+      </span>
+      {% endfor %}
+      {% if holat.qolgan_talabalar != None %}
+      <div class="credits" style="margin:4px 0;">Qolgan talabalar: {{ holat.qolgan_talabalar }}</div>
+      {% endif %}
+      {% if holat.qolgan_talabalar == None or holat.qolgan_talabalar > 0 %}
+      <form hx-post="{% url 'kafedra:kurs_ishi_yaratish' fs.pk %}" hx-target="#panel-{{ fs.pk }}" hx-swap="innerHTML"
+            style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select name="oqituvchi" required>
+          <option value="">O'qituvchi tanlang</option>
+          {% for profil in oqituvchilar %}
+          <option value="{{ profil.pk }}">{{ profil }}</option>
+          {% endfor %}
+        </select>
+        <input type="number" name="talabalar_soni" min="1" {% if holat.qolgan_talabalar != None %}max="{{ holat.qolgan_talabalar }}"{% endif %}
+               placeholder="Talabalar soni" style="width:140px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:6px;font-size:13px;" required>
+        <button type="submit" class="btn btn-primary">Qo'shish</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
