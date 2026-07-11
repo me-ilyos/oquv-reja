@@ -1,0 +1,62 @@
+{% load ui %}
+<tr x-show="{{ guruh_flag }}" class="{% if satr.biriktirilmagan %}qator-biriktirilmagan{% endif %}">
+  <td class="col-idx">{{ satr.fan.raqam }}</td>
+  <td class="col-code"><span class="code">{{ satr.variant.kodi|default:"—" }}</span></td>
+  <td class="col-name">
+    {% if satr.tanlanmagan %}{{ satr.variant.nomi }} <span class="tag tag-elec">TANLANMAGAN</span>
+    {% else %}{{ satr.variant.nomi }}{% endif %}
+  </td>
+  <td class="credits">{% if satr.fan.kredit %}{{ satr.fan.kredit }} kr{% else %}—{% endif %}</td>
+  {% for s in semestr_raqamlari %}
+  {% with fs=satr.semestr_soatlari|kalit:s %}
+  <td class="sem-cell">
+    {% if fs %}
+    <div class="sem-fill" title="{{ satr.variant.nomi }} — S{{ s }}: ma'ruza {{ fs.maruza_soat }}, amaliyot {{ fs.amaliyot_soat }}, lab {{ fs.laboratoriya_soat }}, seminar {{ fs.seminar_soat }}{% if fs.kurs_ishi_bor %}, kurs ishi{% endif %}">{{ fs.haftalik_soat }}</div>
+    {% else %}
+    <div class="sem-empty"></div>
+    {% endif %}
+  </td>
+  {% endwith %}
+  {% endfor %}
+  <td class="assign-cell cell-relative" x-data="{ ochiq: false }" @click.outside="ochiq = false">
+    {% if satr.tanlanmagan %}
+    <button type="button" class="teacher-chip empty" @click="ochiq = !ochiq">Variant tanlanmagan</button>
+    <div class="popover" x-show="ochiq" x-cloak>
+      {% for v in satr.fan.variantlar.all %}
+      <form method="post" action="{% url 'office:variant_tanlash' satr.fan.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="variant" value="{{ v.pk }}">
+        <input type="hidden" name="redirect" value="{% url 'office:reja_detail' reja.pk %}">
+        <button type="submit" class="opt">{{ v.nomi }}</button>
+      </form>
+      {% endfor %}
+    </div>
+    {% else %}
+    {% if satr.kafedra %}
+    <button type="button" class="teacher-chip" @click="ochiq = !ochiq">
+      <span class="avatar">{{ satr.kafedra.nomi|bosh_harflar }}</span>{{ satr.kafedra.nomi }}
+    </button>
+    {% else %}
+    <button type="button" class="teacher-chip empty" @click="ochiq = !ochiq">+ Kafedra biriktirish</button>
+    {% endif %}
+    <div class="popover" x-show="ochiq" x-cloak>
+      {% for k in kafedralar %}
+      <form method="post" action="{% url 'office:kafedra_biriktirish' satr.variant.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="kafedra" value="{{ k.pk }}">
+        <input type="hidden" name="redirect" value="{% url 'office:reja_detail' reja.pk %}">
+        <button type="submit" class="opt"><span class="avatar">{{ k.nomi|bosh_harflar }}</span>{{ k.nomi }}</button>
+      </form>
+      {% endfor %}
+      {% if satr.kafedra %}
+      <form method="post" action="{% url 'office:kafedra_biriktirish' satr.variant.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="kafedra" value="">
+        <input type="hidden" name="redirect" value="{% url 'office:reja_detail' reja.pk %}">
+        <button type="submit" class="opt clear">Biriktirishni bekor qilish</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </td>
+</tr>

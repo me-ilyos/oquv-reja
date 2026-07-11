@@ -13,6 +13,12 @@ def bosh_harflar(nomi: str) -> str:
 
 
 @register.filter
+def kalit(lugat: dict, k: object) -> object:
+    """Dict lookup by a template variable (Django can't index dynamically)."""
+    return lugat.get(k) if isinstance(lugat, dict) else None
+
+
+@register.filter
 def foiz(qism: int | None, jami: int | None) -> int:
     """Integer percentage of qism/jami, clamped to 0..100; 0 when unknown."""
     if not qism or not jami:

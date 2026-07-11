@@ -1,0 +1,18 @@
+{% extends "web/base.html" %}
+{% block title %}Yangi o'quv reja{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="title">Yangi o'quv reja</div>
+    <div class="subtitle">Vazirlik Excel faylini yuklang — fanlar va semestrovka avtomatik hisoblanadi</div>
+  </div>
+</div>
+<div class="card">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% include "web/parts/_form_maydonlari.html" %}
+    <button type="submit" class="btn btn-primary">Import qilish</button>
+    <a class="btn" href="{% url 'office:reja_list' %}">Bekor qilish</a>
+  </form>
+</div>
+{% endblock %}

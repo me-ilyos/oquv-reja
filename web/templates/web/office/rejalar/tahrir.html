@@ -1,0 +1,18 @@
+{% extends "web/base.html" %}
+{% block title %}Rejani tahrirlash{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="title">{{ reja }}</div>
+    <div class="subtitle">Talabalar va guruhlar sonini kiriting — soat talablari shu asosda hisoblanadi</div>
+  </div>
+</div>
+<div class="card">
+  <form method="post">
+    {% csrf_token %}
+    {% include "web/parts/_form_maydonlari.html" %}
+    <button type="submit" class="btn btn-primary">Saqlash</button>
+    <a class="btn" href="{% url 'office:reja_detail' reja.pk %}">Bekor qilish</a>
+  </form>
+</div>
+{% endblock %}

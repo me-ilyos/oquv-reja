@@ -1,8 +1,9 @@
 """Office dashboard: year-scoped KPIs, course list and inline allocation."""
 
+from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
@@ -78,7 +79,15 @@ def kafedra_biriktirish(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 def _qator_javobi(request: HttpRequest, fan: Fan, xato: str | None) -> HttpResponse:
-    """Re-render the mutated course row plus an out-of-band stats block."""
+    """Re-render the mutated course row plus an out-of-band stats block.
+
+    Non-HTMX callers (the reja detail page) pass `redirect` and get a normal
+    redirect with the outcome delivered via messages.
+    """
+    if request.POST.get("redirect"):
+        if xato:
+            messages.error(request, xato)
+        return redirect(request.POST["redirect"])
     _, yil = yilni_tanlash(request.POST.get("yil"))
     kontekst = _dashboard_konteksti(yil) if yil is not None else {}
     satr = next(

@@ -199,6 +199,46 @@ def _tur_yigindisi(fslar: list[FanSemestr]) -> dict[str, int | None]:
 
 
 @dataclass(frozen=True)
+class SemestrovkaSatri:
+    """One reja-detail row: a fan's weekly load across every semester."""
+
+    fan: Fan
+    variant: FanVariant
+    semestr_soatlari: dict[int, FanSemestr]
+    tanlanmagan: bool
+
+    @property
+    def kafedra(self) -> Department | None:
+        return self.variant.kafedra if not self.tanlanmagan else None
+
+    @property
+    def biriktirilmagan(self) -> bool:
+        return self.kafedra is None
+
+
+def reja_semestrovkasi(reja: OquvReja) -> list[SemestrovkaSatri]:
+    """The semestrovka: per-fan per-semester split rows for one reja."""
+    fanlar = reja.fanlar.select_related("tanlangan_variant__kafedra").prefetch_related(
+        "variantlar__semestrlar"
+    )
+    satrlar = []
+    for fan in fanlar:
+        variantlar = list(fan.variantlar.all())
+        variant = fan.tanlangan_variant or (variantlar[0] if variantlar else None)
+        if variant is None:
+            continue
+        satrlar.append(
+            SemestrovkaSatri(
+                fan=fan,
+                variant=variant,
+                semestr_soatlari={fs.semestr: fs for fs in variant.semestrlar.all()},
+                tanlanmagan=fan.tanlangan_variant_id is None,
+            )
+        )
+    return satrlar
+
+
+@dataclass(frozen=True)
 class KafedraQamrov:
     """Per-department coverage: delegated demand vs teacher-assigned hours."""
 

@@ -1,0 +1,45 @@
+{% extends "web/base.html" %}
+{% block title %}O'quv rejalar{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="title">O'quv rejalar</div>
+    <div class="subtitle">Import qilingan yo'nalishlar va ularning semestrovkasi</div>
+  </div>
+  <div class="controls">
+    <a class="btn btn-primary" href="{% url 'office:reja_yangi' %}">+ Yangi reja</a>
+  </div>
+</div>
+<div class="table-wrap narrow">
+  <table>
+    <thead>
+      <tr>
+        <th>Kod</th>
+        <th>Yo'nalish</th>
+        <th>Boshlanish yili</th>
+        <th>Ta'lim shakli</th>
+        <th>Talabalar</th>
+        <th>Guruhlar</th>
+        <th>Import vaqti</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for reja in rejalar %}
+      <tr>
+        <td><span class="code">{{ reja.yonalish_kodi }}</span></td>
+        <td><a href="{% url 'office:reja_detail' reja.pk %}">{{ reja.yonalish_nomi }}</a></td>
+        <td>{{ reja.boshlanish_yili }}</td>
+        <td>{{ reja.talim_shakli|default:"—" }}</td>
+        <td>{{ reja.talabalar_soni|default:"—" }}</td>
+        <td>{{ reja.guruhlar_soni|default:"—" }}</td>
+        <td>{{ reja.import_vaqti|date:"d.m.Y H:i"|default:"—" }}</td>
+        <td><a class="btn" href="{% url 'office:reja_tahrir' reja.pk %}">Tahrirlash</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8"><div class="empty-state">Hozircha reja import qilinmagan.</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

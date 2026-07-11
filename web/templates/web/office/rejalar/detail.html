@@ -1,0 +1,78 @@
+{% extends "web/base.html" %}
+{% block title %}{{ reja }}{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="title"><span class="badge-major">{{ reja.yonalish_kodi }}</span>{{ reja.yonalish_nomi }}</div>
+    <div class="subtitle">
+      {{ reja.boshlanish_yili }}-yil · {{ reja.daraja|default:"—" }} · {{ reja.talim_shakli|default:"—" }} ·
+      {{ reja.semestrlar_soni }} semestr · {{ reja.manba_fayl }}
+    </div>
+  </div>
+  <div class="controls">
+    <a class="btn" href="{% url 'office:reja_list' %}">← Rejalar</a>
+    <a class="btn btn-primary" href="{% url 'office:reja_tahrir' reja.pk %}">Tahrirlash</a>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="num">{{ reja.talabalar_soni|default:"—" }}</div><div class="lbl">Talabalar soni</div></div>
+  <div class="stat">
+    <div class="num">{{ reja.guruhlar_soni|default:"—" }}</div>
+    <div class="lbl">Guruhlar{% if reja.guruhlar.all %}: {% for g in reja.guruhlar.all %}{{ g.nomi }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}</div>
+  </div>
+  <div class="stat {% if stat.kafedraga_biriktirilmagan_soat %}warn{% else %}ok{% endif %}">
+    <div class="num">{{ stat.kafedraga_biriktirilmagan_soat }}</div>
+    <div class="lbl">Kafedraga biriktirilmagan soat</div>
+  </div>
+  <div class="stat {% if stat.taqsimlanmagan_soat %}warn{% else %}ok{% endif %}">
+    <div class="num">{{ stat.taqsimlanmagan_soat }}</div>
+    <div class="lbl">O'qituvchiga taqsimlanmagan soat</div>
+  </div>
+</div>
+
+<div class="legend">
+  <span><span class="dot" style="background:var(--accent);"></span>Semestrdagi haftalik soat</span>
+  <span><span class="dot" style="background:var(--unassigned-soft);border:1px solid var(--unassigned);"></span>Kafedraga biriktirilmagan</span>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="col-idx">№</th>
+        <th class="col-code">Kod</th>
+        <th class="col-name">Fan</th>
+        <th>Kredit</th>
+        {% for s in semestr_raqamlari %}<th class="sem-h">S{{ s }}</th>{% endfor %}
+        <th class="assign-cell">Kafedra</th>
+      </tr>
+    </thead>
+    <tbody x-data="{ majburiy: true, tanlov: true }">
+      <tr class="group-row" :class="!majburiy && 'collapsed'">
+        <td colspan="{{ semestr_raqamlari|length|add:5 }}">
+          <span class="toggle" @click="majburiy = !majburiy">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            Majburiy fanlar <span class="group-count">({{ majburiy_satrlar|length }} ta fan)</span>
+          </span>
+        </td>
+      </tr>
+      {% for satr in majburiy_satrlar %}
+      {% include "web/office/rejalar/_semestrovka_qatori.html" with guruh_flag="majburiy" %}
+      {% endfor %}
+      <tr class="group-row" :class="!tanlov && 'collapsed'">
+        <td colspan="{{ semestr_raqamlari|length|add:5 }}">
+          <span class="toggle" @click="tanlov = !tanlov">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            Tanlov fanlari <span class="group-count">({{ tanlov_satrlar|length }} ta fan)</span>
+          </span>
+        </td>
+      </tr>
+      {% for satr in tanlov_satrlar %}
+      {% include "web/office/rejalar/_semestrovka_qatori.html" with guruh_flag="tanlov" %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="hint">Semestr katagidagi raqam — o'sha semestrdagi haftalik soat. Kafedra ustunidan fanni kafedraga biriktiring.</div>
+{% endblock %}
