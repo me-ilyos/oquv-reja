@@ -8,6 +8,8 @@
       <a class="nav-link {% if 'oqituvchi' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'office:oqituvchi_list' %}">O'qituvchilar</a>
     {% elif user.is_department_admin %}
       <a class="nav-link {% if request.resolver_match.view_name == 'kafedra:dashboard' %}active{% endif %}" href="{% url 'kafedra:dashboard' %}">Boshqaruv paneli</a>
+      <a class="nav-link {% if 'oqituvchi' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'kafedra:oqituvchi_list' %}">O'qituvchilar</a>
+      <a class="nav-link {% if request.resolver_match.view_name == 'kafedra:hisobot' %}active{% endif %}" href="{% url 'kafedra:hisobot' %}">Hisobot</a>
     {% elif user.is_teacher %}
       <a class="nav-link {% if request.resolver_match.view_name == 'men:yuklamalar' %}active{% endif %}" href="{% url 'men:yuklamalar' %}">Mening yuklamam</a>
     {% endif %}

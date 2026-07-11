@@ -1,6 +1,12 @@
 from django.urls import path
 
 from web.views.kafedra.dashboard import KafedraDashboardView
+from web.views.kafedra.hisobot import HisobotView
+from web.views.kafedra.oqituvchilar import (
+    KafedraOqituvchiListView,
+    KafedraOqituvchiTahrirView,
+    KafedraOqituvchiYangiView,
+)
 from web.views.kafedra.yuklama import (
     TaqsimotPanelView,
     YuklamaOchirishView,
@@ -34,4 +40,16 @@ urlpatterns = [
         YuklamaOchirishView.as_view(),
         name="yuklama_ochirish",
     ),
+    path("oqituvchilar/", KafedraOqituvchiListView.as_view(), name="oqituvchi_list"),
+    path(
+        "oqituvchilar/yangi/",
+        KafedraOqituvchiYangiView.as_view(),
+        name="oqituvchi_yangi",
+    ),
+    path(
+        "oqituvchilar/<int:pk>/tahrir/",
+        KafedraOqituvchiTahrirView.as_view(),
+        name="oqituvchi_tahrir",
+    ),
+    path("hisobot/", HisobotView.as_view(), name="hisobot"),
 ]

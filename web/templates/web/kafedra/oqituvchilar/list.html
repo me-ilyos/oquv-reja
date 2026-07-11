@@ -1,0 +1,61 @@
+{% extends "web/base.html" %}
+{% load ui %}
+{% block title %}{{ kafedra.nomi }} — O'qituvchilar{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="title"><span class="badge-major">{{ kafedra.nomi }}</span>O'qituvchilar</div>
+    <div class="subtitle">Yillik yuklama qamrovi — {{ yil }}/{{ yil|add:1 }}. Kamomadi kattalar yuqorida</div>
+  </div>
+  <div class="controls">
+    {% if yillar %}
+    <form method="get">
+      <select name="yil" onchange="this.form.submit()">
+        {% for y in yillar %}
+        <option value="{{ y }}" {% if y == yil %}selected{% endif %}>{{ y }}/{{ y|add:1 }} o'quv yili</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+    <a class="btn btn-primary" href="{% url 'kafedra:oqituvchi_yangi' %}">+ Yangi o'qituvchi</a>
+  </div>
+</div>
+<div class="table-wrap narrow">
+  <table>
+    <thead>
+      <tr>
+        <th>F.I.Sh</th>
+        <th>Telefon</th>
+        <th>Lavozim</th>
+        <th>Minimal soat</th>
+        <th>Yuklama soat</th>
+        <th style="min-width:120px;">Qamrov</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for holat in holatlar %}
+      <tr>
+        <td>
+          <span class="teacher-chip" style="cursor:default;">
+            <span class="avatar">{{ holat.oqituvchi|stringformat:"s"|bosh_harflar }}</span>{{ holat.oqituvchi }}
+          </span>
+        </td>
+        <td><span class="code">{{ holat.oqituvchi.foydalanuvchi.telefon }}</span></td>
+        <td>{{ holat.oqituvchi.turi.nomi }}</td>
+        <td>{{ holat.min_soat }}</td>
+        <td>{{ holat.jami_soat }}</td>
+        <td>
+          {% with f=holat.jami_soat|foiz:holat.min_soat %}
+          <div class="progress" title="{{ f }}%"><div class="fill {% if holat.kamomad %}warn{% endif %}" style="width:{{ f }}%;"></div></div>
+          {% endwith %}
+        </td>
+        <td><a class="btn" href="{% url 'kafedra:oqituvchi_tahrir' holat.oqituvchi.pk %}">Tahrirlash</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7"><div class="empty-state">Kafedrada o'qituvchilar yo'q.</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

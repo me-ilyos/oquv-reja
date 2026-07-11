@@ -139,6 +139,48 @@ class YuklamaYaratishTests(KafedraAsosTest):
         self.assertEqual(javob.status_code, 404)
 
 
+class KafedraOqituvchilarTests(KafedraAsosTest):
+    def test_faqat_oz_kafedrasi_royxatda(self) -> None:
+        begona = make_oqituvchi(kafedra=Department.objects.create(nomi="Begona"))
+        javob = self.client.get(reverse("kafedra:oqituvchi_list"))
+        self.assertContains(javob, str(self.oqituvchi))
+        self.assertNotContains(javob, str(begona))
+
+    def test_yaratish_oz_kafedrasiga_boglanadi(self) -> None:
+        from accounts.models import Foydalanuvchi, OqituvchiTuri
+
+        turi = OqituvchiTuri.objects.first()
+        javob = self.client.post(
+            reverse("kafedra:oqituvchi_yangi"),
+            {
+                "telefon": "+998971112233",
+                "first_name": "Sanjar",
+                "last_name": "Qodirov",
+                "turi": turi.pk,
+                "parol": "juda-maxfiy-parol-7",
+            },
+        )
+        self.assertRedirects(javob, reverse("kafedra:oqituvchi_list"))
+        yangi = Foydalanuvchi.objects.get(telefon="+998971112233")
+        self.assertEqual(yangi.oqituvchi_profil.kafedra, self.kafedra)
+
+    def test_begona_oqituvchini_tahrirlay_olmaydi(self) -> None:
+        begona = make_oqituvchi(kafedra=Department.objects.create(nomi="Begona"))
+        javob = self.client.get(reverse("kafedra:oqituvchi_tahrir", args=[begona.pk]))
+        self.assertEqual(javob.status_code, 404)
+
+
+class HisobotTests(KafedraAsosTest):
+    def test_hisobot_jami_soatlar(self) -> None:
+        Yuklama.objects.create(
+            fan_semestr=self.fs, tur=SoatTuri.MARUZA, oqituvchi=self.oqituvchi
+        )
+        javob = self.client.get(reverse("kafedra:hisobot"))
+        self.assertContains(javob, "yuklama hisoboti")
+        self.assertContains(javob, "Kafedra mudiri")
+        self.assertEqual(javob.context["jami_yuklama"], 24)
+
+
 class YuklamaOchirishTests(KafedraAsosTest):
     def test_ochiriladi(self) -> None:
         yuklama = Yuklama.objects.create(
