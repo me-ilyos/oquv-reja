@@ -1,7 +1,13 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from accounts.models import Department, Foydalanuvchi, OqituvchiProfil, OqituvchiTuri
+from accounts.models import (
+    Department,
+    Foydalanuvchi,
+    OqituvchiProfil,
+    OqituvchiTuri,
+    Universitet,
+)
 
 
 @admin.register(Foydalanuvchi)
@@ -43,6 +49,11 @@ class FoydalanuvchiAdmin(UserAdmin):
             },
         ),
     )
+
+
+@admin.register(Universitet)
+class UniversitetAdmin(admin.ModelAdmin):
+    list_display = ("rasmiy_nomi",)
 
 
 @admin.register(OqituvchiTuri)

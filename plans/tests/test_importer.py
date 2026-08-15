@@ -2,9 +2,18 @@ from django.test import TestCase
 
 from accounts.models import Department
 from parser.models import Alternative, Course, SelectiveSlot
-from plans.importer import ImportXato, ParsedReja, import_reja
+from plans.importer import ImportNatija, ImportXato, ParsedReja
+from plans.importer import import_reja as _import_reja
 from plans.models import FanSemestr, FanTuri, SoatTuri, Yuklama
 from plans.tests.factories import make_oqituvchi
+
+
+def import_reja(parsed: ParsedReja, **kwargs: object) -> ImportNatija:
+    kwargs.setdefault("bilim_sohasi_kodi", "6")
+    kwargs.setdefault("bilim_sohasi_nomi", "Test bilim sohasi")
+    kwargs.setdefault("talim_sohasi_kodi", "606")
+    kwargs.setdefault("talim_sohasi_nomi", "Test ta'lim sohasi")
+    return _import_reja(parsed, **kwargs)
 
 
 def make_course(**kwargs: object) -> Course:

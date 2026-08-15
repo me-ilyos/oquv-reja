@@ -1,6 +1,12 @@
 {% extends "web/base.html" %}
 {% block title %}{{ reja }}{% endblock %}
 {% block content %}
+<div x-data="{ semestrovka: {% if request.GET.tab == 'semestrovka' %}true{% else %}false{% endif %} }">
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'office:reja_list' %}">O'quv rejalar</a>
+  <span class="sep">/</span>
+  <span class="current">{{ reja.yonalish_kodi }}</span>
+</nav>
 <div class="topbar">
   <div>
     <div class="title"><span class="badge-major">{{ reja.yonalish_kodi }}</span>{{ reja.yonalish_nomi }}</div>
@@ -10,7 +16,7 @@
     </div>
   </div>
   <div class="controls">
-    <a class="btn" href="{% url 'office:reja_list' %}">← Rejalar</a>
+    <button type="button" class="chip-btn" :class="semestrovka && 'active'" @click="semestrovka = !semestrovka">Semestrovka</button>
     <a class="btn btn-primary" href="{% url 'office:reja_tahrir' reja.pk %}">Tahrirlash</a>
   </div>
 </div>
@@ -36,14 +42,14 @@
   <span><span class="dot" style="background:var(--unassigned-soft);border:1px solid var(--unassigned);"></span>Kafedraga biriktirilmagan</span>
 </div>
 
-<div class="table-wrap">
+<div class="table-wrap" x-show="!semestrovka">
   <table>
     <thead>
       <tr>
         <th class="col-idx">№</th>
         <th class="col-code">Kod</th>
         <th class="col-name">Fan</th>
-        <th>Kredit</th>
+        <th class="num">Kredit</th>
         {% for s in semestr_raqamlari %}<th class="sem-h">S{{ s }}</th>{% endfor %}
         <th class="assign-cell">Kafedra</th>
       </tr>
@@ -74,5 +80,9 @@
     </tbody>
   </table>
 </div>
+<div class="table-wrap" x-show="semestrovka" x-cloak>
+  {% include "web/office/rejalar/_semestrovka_breakdown.html" %}
+</div>
 <div class="hint">Semestr katagidagi raqam — o'sha semestrdagi haftalik soat. Kafedra ustunidan fanni kafedraga biriktiring.</div>
+</div>
 {% endblock %}

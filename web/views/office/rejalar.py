@@ -1,18 +1,23 @@
 """O'quv reja screens: list, Excel import, detail (semestrovka) and edit."""
 
+import re
+
 from django.contrib import messages
-from django.http import HttpResponse
-from django.shortcuts import redirect
+from django.core.exceptions import ValidationError
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, FormView, ListView, UpdateView
 
 from accounts.models import Department
 from plans import dashboard, services
 from plans.importer import ImportNatija, ImportXato
 from plans.models import OquvReja
+from plans.services import SemestrTahrir, semestrovka_yangilash
 from plans.uploads import fayldan_import_qilish
 from web.forms.reja import RejaImportForm, RejaTahrirForm
-from web.mixins import OfficeAdminTalabMixin
+from web.mixins import OfficeAdminTalabMixin, office_admin_talab
 
 
 class RejaListView(OfficeAdminTalabMixin, ListView):
@@ -83,3 +88,48 @@ class RejaTahrirView(OfficeAdminTalabMixin, UpdateView):
 
     def get_success_url(self) -> str:
         return reverse("office:reja_detail", kwargs={"pk": self.object.pk})
+
+
+_FS_MARUZA = re.compile(r"^fs-(\d+)-maruza$")
+
+
+def _musbat_int(qiymat: str | None) -> int:
+    try:
+        return max(0, int(qiymat))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _tahrirlarni_oqish(post: object) -> list[SemestrTahrir]:
+    """Collect one SemestrTahrir per fs-<pk>-* input group in the POST body."""
+    tahrirlar = []
+    for kalit in post:
+        mos = _FS_MARUZA.match(kalit)
+        if mos is None:
+            continue
+        pk = int(mos.group(1))
+        tahrirlar.append(
+            SemestrTahrir(
+                fan_semestr_id=pk,
+                maruza_soat=_musbat_int(post.get(f"fs-{pk}-maruza")),
+                amaliyot_soat=_musbat_int(post.get(f"fs-{pk}-amaliyot")),
+                laboratoriya_soat=_musbat_int(post.get(f"fs-{pk}-lab")),
+                seminar_soat=_musbat_int(post.get(f"fs-{pk}-seminar")),
+                kurs_ishi_bor=post.get(f"fs-{pk}-kursishi") == "on",
+            )
+        )
+    return tahrirlar
+
+
+@require_POST
+@office_admin_talab
+def semestrovka_saqlash(request: HttpRequest, pk: int) -> HttpResponse:
+    reja = get_object_or_404(OquvReja, pk=pk)
+    try:
+        semestrovka_yangilash(reja, _tahrirlarni_oqish(request.POST))
+    except ValidationError as xato:
+        messages.error(request, " ".join(xato.messages))
+    else:
+        messages.success(request, "Semestrovka saqlandi.")
+    manzil = reverse("office:reja_detail", kwargs={"pk": reja.pk})
+    return redirect(f"{manzil}?tab=semestrovka")

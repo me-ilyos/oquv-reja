@@ -35,8 +35,12 @@ PER_GURUH_TURLAR = (SoatTuri.AMALIYOT, SoatTuri.LABORATORIYA, SoatTuri.SEMINAR)
 class OquvReja(models.Model):
     """One major intake: a curriculum (direction + start year + study form)."""
 
+    bilim_sohasi_kodi = models.CharField(max_length=10)
+    bilim_sohasi_nomi = models.CharField(max_length=255)
+    talim_sohasi_kodi = models.CharField(max_length=10)
+    talim_sohasi_nomi = models.CharField(max_length=255)
     yonalish_kodi = models.CharField(max_length=20)
-    yonalish_nomi = models.CharField(max_length=255)
+    yonalish_nomi = models.CharField(max_length=255, blank=True)
     boshlanish_yili = models.PositiveSmallIntegerField()
     daraja = models.CharField(max_length=100, blank=True)
     talim_shakli = models.CharField(max_length=100, blank=True)

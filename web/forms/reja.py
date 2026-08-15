@@ -11,6 +11,10 @@ class RejaImportForm(forms.Form):
         label="Excel fayl (.xlsx)",
         widget=forms.ClearableFileInput(attrs={"accept": ".xlsx"}),
     )
+    bilim_sohasi_kodi = forms.CharField(label="Bilim sohasi kodi", max_length=10)
+    bilim_sohasi_nomi = forms.CharField(label="Bilim sohasi nomi", max_length=255)
+    talim_sohasi_kodi = forms.CharField(label="Ta'lim sohasi kodi", max_length=10)
+    talim_sohasi_nomi = forms.CharField(label="Ta'lim sohasi nomi", max_length=255)
     boshlanish_yili = forms.IntegerField(
         label="Boshlanish yili",
         required=False,
@@ -30,6 +34,10 @@ class RejaImportForm(forms.Form):
 
     def parametrlar(self) -> YuklashParametrlari:
         return YuklashParametrlari(
+            bilim_sohasi_kodi=self.cleaned_data["bilim_sohasi_kodi"],
+            bilim_sohasi_nomi=self.cleaned_data["bilim_sohasi_nomi"],
+            talim_sohasi_kodi=self.cleaned_data["talim_sohasi_kodi"],
+            talim_sohasi_nomi=self.cleaned_data["talim_sohasi_nomi"],
             talabalar_soni=self.cleaned_data["talabalar_soni"],
             guruhlar_soni=self.cleaned_data["guruhlar_soni"],
             guruh_prefiksi=self.cleaned_data["guruh_prefiksi"],
@@ -41,8 +49,23 @@ class RejaImportForm(forms.Form):
 class RejaTahrirForm(forms.ModelForm):
     class Meta:
         model = OquvReja
-        fields = ["yonalish_nomi", "talabalar_soni", "guruhlar_soni", "guruh_prefiksi"]
+        fields = [
+            "bilim_sohasi_kodi",
+            "bilim_sohasi_nomi",
+            "talim_sohasi_kodi",
+            "talim_sohasi_nomi",
+            "yonalish_kodi",
+            "yonalish_nomi",
+            "talabalar_soni",
+            "guruhlar_soni",
+            "guruh_prefiksi",
+        ]
         labels = {
+            "bilim_sohasi_kodi": "Bilim sohasi kodi",
+            "bilim_sohasi_nomi": "Bilim sohasi nomi",
+            "talim_sohasi_kodi": "Ta'lim sohasi kodi",
+            "talim_sohasi_nomi": "Ta'lim sohasi nomi",
+            "yonalish_kodi": "Yo'nalish kodi",
             "yonalish_nomi": "Yo'nalish nomi",
             "talabalar_soni": "Talabalar soni",
             "guruhlar_soni": "Guruhlar soni",

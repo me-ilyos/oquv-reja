@@ -73,6 +73,15 @@ class Foydalanuvchi(AbstractBaseUser, PermissionsMixin):
         return self.first_name
 
     @property
+    def rasmiy_qisqa_ism(self) -> str:
+        """'Husainov I.' — surname + given-name initial, for official documents."""
+        return (
+            f"{self.last_name} {self.first_name[0]}."
+            if self.first_name
+            else self.last_name
+        )
+
+    @property
     def is_superadmin(self) -> bool:
         return self.rol == Rol.SUPERADMIN
 
@@ -99,10 +108,24 @@ class OqituvchiTuri(models.Model):
         return self.nomi
 
 
+class Universitet(models.Model):
+    """Institution-wide info. Expected to hold exactly one row."""
+
+    rasmiy_nomi = models.CharField(max_length=255)
+
+    class Meta:
+        verbose_name = "Universitet"
+        verbose_name_plural = "Universitet"
+
+    def __str__(self) -> str:
+        return self.rasmiy_nomi
+
+
 class Department(models.Model):
     """Kafedra."""
 
     nomi = models.CharField(max_length=200, unique=True)
+    fakultet = models.CharField(max_length=200, blank=True)
     mudir = models.OneToOneField(
         "OqituvchiProfil",
         null=True,

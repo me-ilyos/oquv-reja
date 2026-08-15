@@ -1,0 +1,7 @@
+<div class="test-rejimi">
+  <span>Test rejimi — <strong>{{ user.get_full_name }}</strong> ({{ user.get_rol_display }}) sifatida ko'rilmoqda</span>
+  <form method="post" action="{% url 'dev:qaytish' %}">
+    {% csrf_token %}
+    <button type="submit">Asl hisobga qaytish</button>
+  </form>
+</div>

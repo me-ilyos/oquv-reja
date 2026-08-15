@@ -2,7 +2,21 @@
 
 from django import template
 
+from accounts.models import OqituvchiProfil
+from accounts.services import universitet_olish
+
 register = template.Library()
+
+
+@register.filter
+def rasmiy_matn(profil: OqituvchiProfil) -> str:
+    """Official doc line, e.g. 'Husainov I. – Universitet, "Kafedra" o'qituvchisi.'"""
+    universitet = universitet_olish()
+    universitet_nomi = universitet.rasmiy_nomi if universitet else "—"
+    return (
+        f"{profil.foydalanuvchi.rasmiy_qisqa_ism} – {universitet_nomi}, "
+        f"“{profil.kafedra.nomi}” kafedrasi {profil.turi.nomi}."
+    )
 
 
 @register.filter
@@ -24,3 +38,11 @@ def foiz(qism: int | None, jami: int | None) -> int:
     if not qism or not jami:
         return 0
     return min(100, round(100 * qism / jami))
+
+
+@register.filter
+def kopaytir(qiymat: int | None, marta: int | None) -> int | None:
+    """Multiply two counts for the per-group demand tooltip; None if either is unset."""
+    if not qiymat or not marta:
+        return None
+    return qiymat * marta

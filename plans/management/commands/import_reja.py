@@ -12,6 +12,18 @@ class Command(BaseCommand):
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument("files", nargs="+", type=Path)
         parser.add_argument(
+            "--bilim-sohasi-kodi", required=True, help="Bilim sohasi kodi."
+        )
+        parser.add_argument(
+            "--bilim-sohasi-nomi", required=True, help="Bilim sohasi nomi."
+        )
+        parser.add_argument(
+            "--talim-sohasi-kodi", required=True, help="Ta'lim sohasi kodi."
+        )
+        parser.add_argument(
+            "--talim-sohasi-nomi", required=True, help="Ta'lim sohasi nomi."
+        )
+        parser.add_argument(
             "--replace",
             action="store_true",
             help="Mavjud rejani qayta yuklaydi (yuklamalar bo'lmasa).",
@@ -27,7 +39,7 @@ class Command(BaseCommand):
         xatolar = 0
         for path in options["files"]:
             try:
-                natija = self._bitta_fayl(path, options["replace"], options["yil"])
+                natija = self._bitta_fayl(path, options)
                 self._chiqarish(path, natija)
             except ImportXato as xato:
                 self.stderr.write(self.style.ERROR(f"{path.name}: {xato}"))
@@ -35,10 +47,17 @@ class Command(BaseCommand):
         if xatolar:
             raise CommandError(f"{xatolar} ta fayl import qilinmadi")
 
-    def _bitta_fayl(self, path: Path, replace: bool, yil: int | None) -> ImportNatija:
+    def _bitta_fayl(self, path: Path, options: dict[str, object]) -> ImportNatija:
         if not path.exists():
             raise ImportXato("fayl topilmadi")
-        return import_reja(parse_xlsx(path, boshlanish_yili=yil), replace=replace)
+        return import_reja(
+            parse_xlsx(path, boshlanish_yili=options["yil"]),
+            bilim_sohasi_kodi=options["bilim_sohasi_kodi"],
+            bilim_sohasi_nomi=options["bilim_sohasi_nomi"],
+            talim_sohasi_kodi=options["talim_sohasi_kodi"],
+            talim_sohasi_nomi=options["talim_sohasi_nomi"],
+            replace=options["replace"],
+        )
 
     def _chiqarish(self, path: Path, natija: ImportNatija) -> None:
         holat = "yaratildi" if natija.yaratildi else "yangilandi"

@@ -5,11 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}O'quv yuklamasi{% endblock %}</title>
 <link rel="stylesheet" href="{% static 'web/css/app.css' %}">
+<script>document.documentElement.dataset.density = localStorage.getItem('zichlik') || 'comfortable';</script>
 <script src="{% static 'web/js/htmx.min.js' %}" defer></script>
 <script src="{% static 'web/js/alpine.min.js' %}" defer></script>
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 {% if user.is_authenticated %}{% include "web/parts/_navbar.html" %}{% endif %}
+{% if debug_rejim and request.session.dev_asl_foydalanuvchi %}{% include "web/parts/_test_rejimi.html" %}{% endif %}
 <div class="app">
   {% include "web/parts/_messages.html" %}
   {% block content %}{% endblock %}

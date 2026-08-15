@@ -1,0 +1,19 @@
+{# Loading placeholder that mimics the table shape during HTMX swaps. #}
+<div class="skeleton-table" aria-hidden="true">
+  <div class="skeleton-row head">
+    <div class="skeleton-bar" style="width:12%;"></div>
+    <div class="skeleton-bar" style="width:30%;"></div>
+    <div class="skeleton-bar" style="width:14%;"></div>
+    <div class="skeleton-bar" style="width:14%;"></div>
+    <div class="skeleton-bar" style="width:18%;"></div>
+  </div>
+  {% for _ in "123456" %}
+  <div class="skeleton-row">
+    <div class="skeleton-bar" style="width:10%;"></div>
+    <div class="skeleton-bar" style="width:34%;"></div>
+    <div class="skeleton-bar" style="width:12%;"></div>
+    <div class="skeleton-bar" style="width:12%;"></div>
+    <div class="skeleton-bar" style="width:20%;"></div>
+  </div>
+  {% endfor %}
+</div>

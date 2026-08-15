@@ -10,4 +10,5 @@ urlpatterns = [
     path("office/", include(("web.urls_office", "office"))),
     path("kafedra/", include(("web.urls_kafedra", "kafedra"))),
     path("men/", include(("web.urls_men", "men"))),
+    path("dev/", include(("web.urls_dev", "dev"))),
 ]

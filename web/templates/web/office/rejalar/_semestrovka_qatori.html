@@ -6,7 +6,7 @@
     {% if satr.tanlanmagan %}{{ satr.variant.nomi }} <span class="tag tag-elec">TANLANMAGAN</span>
     {% else %}{{ satr.variant.nomi }}{% endif %}
   </td>
-  <td class="credits">{% if satr.fan.kredit %}{{ satr.fan.kredit }} kr{% else %}—{% endif %}</td>
+  <td class="credits num">{% if satr.fan.kredit %}{{ satr.fan.kredit }} kr{% else %}—{% endif %}</td>
   {% for s in semestr_raqamlari %}
   {% with fs=satr.semestr_soatlari|kalit:s %}
   <td class="sem-cell">

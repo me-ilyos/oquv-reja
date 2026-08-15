@@ -44,6 +44,22 @@ class DashboardKorinishTests(TestCase):
         self.assertNotContains(javob, "<html")
         self.assertContains(javob, 'id="statlar"')
 
+    def test_semestrovka_har_semestrni_alohida_korsatadi(self) -> None:
+        fan = make_fan(self.reja, maruza_soat=60, amaliyot_soat=60)
+        variant = fan.tanlangan_variant
+        make_fan_semestr(
+            variant, semestr=1, maruza_soat=30, amaliyot_soat=30, laboratoriya_soat=0
+        )
+        make_fan_semestr(
+            variant, semestr=2, maruza_soat=30, amaliyot_soat=30, laboratoriya_soat=0
+        )
+        javob = self.client.get(reverse("office:dashboard"), {"yil": self.joriy})
+        self.assertContains(javob, "Semestrovka")
+        self.assertContains(javob, "<strong>S1</strong>")
+        self.assertContains(javob, "<strong>S2</strong>")
+        # Amaliyot is per-group: 30 curriculum hours x 3 groups = 90 demand in tooltip.
+        self.assertContains(javob, "3 guruh = 90")
+
 
 class KafedraBiriktirishTests(TestCase):
     def setUp(self) -> None:

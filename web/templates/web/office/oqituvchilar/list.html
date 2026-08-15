@@ -26,5 +26,10 @@
     <a class="btn btn-primary" href="{% url 'office:oqituvchi_yangi' %}">+ Yangi o'qituvchi</a>
   </div>
 </div>
+{% if kafedra %}
+<div class="controls" style="margin-bottom:10px;">
+  <a class="chip-removable" href="?yil={{ yil }}" title="Filtrni olib tashlash">Kafedra: {{ kafedra.nomi }} <span class="x">×</span></a>
+</div>
+{% endif %}
 {% include "web/office/oqituvchilar/_jadval.html" %}
 {% endblock %}

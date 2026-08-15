@@ -40,7 +40,12 @@
     <tbody>
       {% for satr in fs_satrlar %}
       {% include "web/kafedra/_fs_qatori.html" %}
-      <tr><td colspan="8" style="padding:0;border-bottom:0;"><div id="panel-{{ satr.fan_semestr.pk }}"></div></td></tr>
+      <tr><td colspan="8" style="padding:0;border-bottom:0;">
+        <div id="panel-yuk-{{ satr.fan_semestr.pk }}" class="htmx-indicator" style="padding:12px 8px;">
+          <div class="skeleton-bar" style="width:38%;height:13px;"></div>
+        </div>
+        <div id="panel-{{ satr.fan_semestr.pk }}"></div>
+      </td></tr>
       {% empty %}
       <tr><td colspan="8"><div class="empty-state">Bu o'quv yilida kafedraga biriktirilgan fanlar yo'q.</div></td></tr>
       {% endfor %}

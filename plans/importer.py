@@ -18,7 +18,14 @@ from parser.parser import (
     read_metadata,
     resolve_direction,
 )
-from plans.models import Fan, FanSemestr, FanTuri, FanVariant, OquvReja, Yuklama
+from plans.models import (
+    Fan,
+    FanSemestr,
+    FanTuri,
+    FanVariant,
+    OquvReja,
+    Yuklama,
+)
 from plans.split import split_breakdown
 
 
@@ -92,8 +99,23 @@ def _bir_qatorga(matn: str, uzunlik: int) -> str:
 
 
 @transaction.atomic
-def import_reja(parsed: ParsedReja, *, replace: bool = False) -> ImportNatija:
-    reja, yaratildi, holat = _rejani_tayyorlash(parsed, replace)
+def import_reja(
+    parsed: ParsedReja,
+    *,
+    bilim_sohasi_kodi: str,
+    bilim_sohasi_nomi: str,
+    talim_sohasi_kodi: str,
+    talim_sohasi_nomi: str,
+    replace: bool = False,
+) -> ImportNatija:
+    reja, yaratildi, holat = _rejani_tayyorlash(
+        parsed,
+        bilim_sohasi_kodi,
+        bilim_sohasi_nomi,
+        talim_sohasi_kodi,
+        talim_sohasi_nomi,
+        replace,
+    )
     ogohlantirishlar: list[str] = []
     for course in parsed.core:
         ogohlantirishlar += _majburiy_fan_yaratish(reja, course)
@@ -111,10 +133,19 @@ def import_reja(parsed: ParsedReja, *, replace: bool = False) -> ImportNatija:
 
 
 def _rejani_tayyorlash(
-    parsed: ParsedReja, replace: bool
+    parsed: ParsedReja,
+    bilim_sohasi_kodi: str,
+    bilim_sohasi_nomi: str,
+    talim_sohasi_kodi: str,
+    talim_sohasi_nomi: str,
+    replace: bool,
 ) -> tuple[OquvReja, bool, dict | None]:
     """Create the reja or, on re-import, empty it while keeping manual state."""
     yangilanadigan = {
+        "bilim_sohasi_kodi": bilim_sohasi_kodi,
+        "bilim_sohasi_nomi": bilim_sohasi_nomi,
+        "talim_sohasi_kodi": talim_sohasi_kodi,
+        "talim_sohasi_nomi": talim_sohasi_nomi,
         "yonalish_nomi": parsed.yonalish_nomi,
         "daraja": parsed.daraja,
         "davomiylik_yil": parsed.davomiylik_yil,

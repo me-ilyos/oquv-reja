@@ -1,6 +1,11 @@
 {% extends "web/base.html" %}
 {% block title %}O'qituvchi{% endblock %}
 {% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'office:oqituvchi_list' %}">O'qituvchilar</a>
+  <span class="sep">/</span>
+  <span class="current">{% if form.profil %}{{ form.profil }}{% else %}Yangi o'qituvchi{% endif %}</span>
+</nav>
 <div class="topbar">
   <div>
     <div class="title">{% if form.profil %}{{ form.profil }}{% else %}Yangi o'qituvchi{% endif %}</div>

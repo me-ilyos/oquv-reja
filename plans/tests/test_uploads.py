@@ -14,6 +14,10 @@ BHA = Path(__file__).resolve().parents[2] / "sources" / "BHA.xlsx"
 
 def _parametrlar(**kwargs: object) -> YuklashParametrlari:
     maydonlar: dict[str, object] = {
+        "bilim_sohasi_kodi": "6",
+        "bilim_sohasi_nomi": "Test bilim sohasi",
+        "talim_sohasi_kodi": "606",
+        "talim_sohasi_nomi": "Test ta'lim sohasi",
         "talabalar_soni": 50,
         "guruhlar_soni": 2,
         "guruh_prefiksi": "BH",

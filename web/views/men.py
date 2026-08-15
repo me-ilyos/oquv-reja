@@ -2,10 +2,14 @@
 
 from collections import defaultdict
 
+from django.http import FileResponse, HttpRequest, HttpResponse, HttpResponseForbidden
+from django.shortcuts import get_object_or_404
+from django.views import View
 from django.views.generic import TemplateView
 
 from plans import dashboard, services
-from plans.models import SoatTuri, Yuklama
+from plans.dastur.service import dastur_egasimi, dastur_render
+from plans.models import FanVariant, SoatTuri, Yuklama
 from web.mixins import OqituvchiTalabMixin
 from web.views.office.dashboard import yilni_tanlash
 
@@ -37,6 +41,21 @@ class MenYuklamalarimView(OqituvchiTalabMixin, TemplateView):
             }
         )
         return context
+
+
+class MenOquvDasturView(OqituvchiTalabMixin, View):
+    def get(self, request: HttpRequest, variant_id: int) -> HttpResponse:
+        variant = get_object_or_404(FanVariant, pk=variant_id)
+        profil = getattr(request.user, "oqituvchi_profil", None)
+        if profil is None or not dastur_egasimi(variant, profil):
+            return HttpResponseForbidden(
+                "Bu fan dasturini faqat ma'ruza egasi yaratishi mumkin."
+            )
+        return FileResponse(
+            dastur_render(variant),
+            as_attachment=True,
+            filename=f"{variant.kodi or variant.nomi}_oquv_dastur.docx",
+        )
 
 
 def _tur_jami(yuklamalar: list[Yuklama]) -> list[tuple[str, int]]:

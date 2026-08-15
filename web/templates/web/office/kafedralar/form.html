@@ -1,6 +1,11 @@
 {% extends "web/base.html" %}
 {% block title %}Kafedra{% endblock %}
 {% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'office:kafedra_list' %}">Kafedralar</a>
+  <span class="sep">/</span>
+  <span class="current">{% if form.instance.pk %}{{ form.instance.nomi }}{% else %}Yangi kafedra{% endif %}</span>
+</nav>
 <div class="topbar">
   <div>
     <div class="title">{% if form.instance.pk %}{{ form.instance.nomi }}{% else %}Yangi kafedra{% endif %}</div>

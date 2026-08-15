@@ -3,8 +3,13 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import Department
-from plans.models import FanTuri
-from plans.tests.factories import make_fan, make_fan_semestr, make_reja
+from plans.models import FanTuri, SoatTuri, Yuklama
+from plans.tests.factories import (
+    make_fan,
+    make_fan_semestr,
+    make_oqituvchi,
+    make_reja,
+)
 from web.tests.helpers import login, office_admin_yarat
 
 
@@ -27,6 +32,10 @@ class RejaImportTests(TestCase):
             reverse("office:reja_yangi"),
             {
                 "fayl": SimpleUploadedFile("reja.xlsx", b"bu excel emas"),
+                "bilim_sohasi_kodi": "6",
+                "bilim_sohasi_nomi": "Test bilim sohasi",
+                "talim_sohasi_kodi": "606",
+                "talim_sohasi_nomi": "Test ta'lim sohasi",
                 "talabalar_soni": 50,
                 "guruhlar_soni": 2,
                 "guruh_prefiksi": "BH",
@@ -47,6 +56,23 @@ class RejaDetailTests(TestCase):
         self.assertContains(javob, "sem-fill")
         self.assertContains(javob, "Majburiy fanlar")
         self.assertContains(javob, "Dasturlashga kirish")
+
+    def test_semestrovka_breakdown_har_semestrni_yoyadi(self) -> None:
+        fan = make_fan(self.reja, maruza_soat=60, amaliyot_soat=60)
+        variant = fan.tanlangan_variant
+        make_fan_semestr(
+            variant, semestr=1, maruza_soat=30, amaliyot_soat=30, laboratoriya_soat=0
+        )
+        make_fan_semestr(
+            variant, semestr=2, maruza_soat=30, amaliyot_soat=30, laboratoriya_soat=0
+        )
+        javob = self.client.get(reverse("office:reja_detail", args=[self.reja.pk]))
+        # The toggled breakdown table lists each occupied semester as its own row,
+        # with editable hour inputs.
+        self.assertContains(javob, "<strong>S1</strong>")
+        self.assertContains(javob, "<strong>S2</strong>")
+        self.assertContains(javob, 'class="soat-input"')
+        self.assertContains(javob, "-amaliyot")
 
     def test_tanlanmagan_tanlov_belgisi(self) -> None:
         fan = make_fan(self.reja, raqam="2.01", turi=FanTuri.TANLOV)
@@ -71,6 +97,72 @@ class RejaDetailTests(TestCase):
         self.assertEqual(variant.kafedra, kafedra)
 
 
+class SemestrovkaTahrirTests(TestCase):
+    def setUp(self) -> None:
+        self.reja = make_reja()
+        self.fan = make_fan(self.reja, maruza_soat=60, amaliyot_soat=60)
+        self.fs = make_fan_semestr(
+            self.fan.tanlangan_variant,
+            semestr=1,
+            maruza_soat=30,
+            amaliyot_soat=30,
+            laboratoriya_soat=0,
+        )
+        login(self.client, office_admin_yarat())
+
+    def _saqlash(self, **ozgarishlar: object) -> object:
+        maydonlar = {
+            f"fs-{self.fs.pk}-maruza": 40,
+            f"fs-{self.fs.pk}-amaliyot": 20,
+            f"fs-{self.fs.pk}-lab": 0,
+            f"fs-{self.fs.pk}-seminar": 0,
+        }
+        maydonlar.update(ozgarishlar)
+        return self.client.post(
+            reverse("office:semestrovka_saqlash", args=[self.reja.pk]), maydonlar
+        )
+
+    def test_soatlar_yangilanadi(self) -> None:
+        javob = self._saqlash()
+        self.assertRedirects(
+            javob,
+            reverse("office:reja_detail", args=[self.reja.pk]) + "?tab=semestrovka",
+        )
+        self.fs.refresh_from_db()
+        self.assertEqual(self.fs.maruza_soat, 40)
+        self.assertEqual(self.fs.amaliyot_soat, 20)
+
+    def test_kurs_ishi_belgilanadi(self) -> None:
+        self._saqlash(**{f"fs-{self.fs.pk}-kursishi": "on"})
+        self.fs.refresh_from_db()
+        self.assertTrue(self.fs.kurs_ishi_bor)
+
+    def test_taqsimlangan_turni_nolga_tushirib_bolmaydi(self) -> None:
+        oqituvchi = make_oqituvchi()
+        Yuklama.objects.create(
+            fan_semestr=self.fs, tur=SoatTuri.MARUZA, oqituvchi=oqituvchi
+        )
+        self._saqlash(**{f"fs-{self.fs.pk}-maruza": 0})
+        self.fs.refresh_from_db()
+        self.assertEqual(self.fs.maruza_soat, 30)
+
+    def test_boshqa_rejaning_semestri_tegilmaydi(self) -> None:
+        boshqa = make_reja(yonalish_kodi="30310100", boshlanish_yili=2023)
+        fan2 = make_fan(boshqa)
+        fs2 = make_fan_semestr(fan2.tanlangan_variant, semestr=1, maruza_soat=24)
+        self.client.post(
+            reverse("office:semestrovka_saqlash", args=[self.reja.pk]),
+            {
+                f"fs-{fs2.pk}-maruza": 0,
+                f"fs-{fs2.pk}-amaliyot": 0,
+                f"fs-{fs2.pk}-lab": 0,
+                f"fs-{fs2.pk}-seminar": 0,
+            },
+        )
+        fs2.refresh_from_db()
+        self.assertEqual(fs2.maruza_soat, 24)
+
+
 class RejaTahrirTests(TestCase):
     def setUp(self) -> None:
         self.reja = make_reja(guruhlar_soni=2)
@@ -80,6 +172,11 @@ class RejaTahrirTests(TestCase):
         javob = self.client.post(
             reverse("office:reja_tahrir", args=[self.reja.pk]),
             {
+                "bilim_sohasi_kodi": self.reja.bilim_sohasi_kodi,
+                "bilim_sohasi_nomi": self.reja.bilim_sohasi_nomi,
+                "talim_sohasi_kodi": self.reja.talim_sohasi_kodi,
+                "talim_sohasi_nomi": self.reja.talim_sohasi_nomi,
+                "yonalish_kodi": self.reja.yonalish_kodi,
                 "yonalish_nomi": self.reja.yonalish_nomi,
                 "talabalar_soni": 90,
                 "guruhlar_soni": 3,

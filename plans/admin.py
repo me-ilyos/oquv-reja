@@ -3,7 +3,15 @@ from django.contrib import admin
 from django.db.models import QuerySet, Sum
 from django.http import HttpRequest
 
-from plans.models import Fan, FanSemestr, FanTuri, FanVariant, Guruh, OquvReja, Yuklama
+from plans.models import (
+    Fan,
+    FanSemestr,
+    FanTuri,
+    FanVariant,
+    Guruh,
+    OquvReja,
+    Yuklama,
+)
 from plans.services import fan_semestr_talabi, guruhlarni_sinxronlash
 
 
@@ -24,12 +32,19 @@ class OquvRejaAdmin(admin.ModelAdmin):
     list_display = (
         "yonalish_kodi",
         "yonalish_nomi",
+        "bilim_sohasi_kodi",
+        "talim_sohasi_kodi",
         "boshlanish_yili",
         "talim_shakli",
         "talabalar_soni",
         "guruhlar_soni",
     )
-    list_filter = ("boshlanish_yili", "talim_shakli")
+    list_filter = (
+        "boshlanish_yili",
+        "talim_shakli",
+        "bilim_sohasi_kodi",
+        "talim_sohasi_kodi",
+    )
     search_fields = ("yonalish_kodi", "yonalish_nomi")
     readonly_fields = ("manba_fayl", "import_vaqti")
     inlines = [GuruhInline]

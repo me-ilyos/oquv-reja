@@ -13,6 +13,7 @@
   <td>
     <button type="button" class="btn"
             hx-get="{% url 'kafedra:taqsimot_panel' satr.fan_semestr.pk %}"
-            hx-target="#panel-{{ satr.fan_semestr.pk }}" hx-swap="innerHTML">Taqsimlash</button>
+            hx-target="#panel-{{ satr.fan_semestr.pk }}" hx-swap="innerHTML"
+            hx-indicator="#panel-yuk-{{ satr.fan_semestr.pk }}" hx-disabled-elt="this">Taqsimlash</button>
   </td>
 </tr>

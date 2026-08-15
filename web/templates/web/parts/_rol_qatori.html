@@ -1,0 +1,19 @@
+{% if nishon.pk == user.pk %}
+  <div class="menu-item joriy">
+    <span class="menu-item-ism">{{ nishon.get_full_name }}</span>
+    <span class="menu-item-izoh">{{ izoh }}</span>
+    <span class="menu-belgi">hozir</span>
+  </div>
+{% else %}
+  <form method="post" action="{% url 'dev:almashtirish' %}">
+    {% csrf_token %}
+    <input type="hidden" name="foydalanuvchi" value="{{ nishon.pk }}">
+    <button type="submit" class="menu-item">
+      <span class="menu-item-ism">{{ nishon.get_full_name }}</span>
+      <span class="menu-item-izoh">{{ izoh }}</span>
+      {% if norma %}
+        <span class="menu-soat {% if soat < norma %}kam{% else %}ok{% endif %}">{{ soat }} / {{ norma }}</span>
+      {% endif %}
+    </button>
+  </form>
+{% endif %}

@@ -46,7 +46,7 @@
 </div>
 {% endif %}
 
-<div class="table-wrap narrow">
+<div class="table-wrap narrow cards">
   <table>
     <thead>
       <tr>
@@ -55,35 +55,42 @@
         <th>Semestr</th>
         <th>Mashg'ulot turi</th>
         <th>Guruh / Talabalar</th>
-        <th>Soat</th>
+        <th class="num">Soat</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
       {% for yuklama in yuklamalar %}
       <tr>
-        <td>
+        <td data-label="Fan">
           <span class="code">{{ yuklama.fan_semestr.variant.kodi|default:"" }}</span>
           <strong>{{ yuklama.fan_semestr.variant.nomi }}</strong>
         </td>
-        <td><span class="code">{{ yuklama.fan_semestr.variant.fan.reja.yonalish_kodi }}</span></td>
-        <td>{{ yuklama.fan_semestr.semestr }}-semestr</td>
-        <td>{{ yuklama.get_tur_display }}</td>
-        <td>
+        <td data-label="Yo'nalish"><span class="code">{{ yuklama.fan_semestr.variant.fan.reja.yonalish_kodi }}</span></td>
+        <td data-label="Semestr">{{ yuklama.fan_semestr.semestr }}-semestr</td>
+        <td data-label="Mashg'ulot turi">{{ yuklama.get_tur_display }}</td>
+        <td data-label="Guruh / Talabalar">
           {% if yuklama.guruh %}{{ yuklama.guruh.nomi }}
           {% elif yuklama.talabalar_soni %}{{ yuklama.talabalar_soni }} talaba
           {% else %}Butun oqim{% endif %}
         </td>
-        <td><strong>{{ yuklama.soat }}</strong></td>
+        <td class="num" data-label="Soat"><strong>{{ yuklama.soat }}</strong></td>
+        <td data-label="">
+          {% if yuklama.tur == "MARUZA" %}
+          <a class="btn" href="{% url 'men:dastur' yuklama.fan_semestr.variant_id %}">Dasturni yaratish</a>
+          {% endif %}
+        </td>
       </tr>
       {% empty %}
-      <tr><td colspan="6"><div class="empty-state">Bu o'quv yilida sizga yuklama taqsimlanmagan.</div></td></tr>
+      <tr><td colspan="7"><div class="empty-state">Bu o'quv yilida sizga yuklama taqsimlanmagan.</div></td></tr>
       {% endfor %}
     </tbody>
     {% if yuklamalar %}
     <tfoot>
       <tr>
         <td colspan="5" style="text-align:right;font-weight:600;">Jami:</td>
-        <td><strong>{{ jami_soat }}</strong></td>
+        <td class="num" data-label="Jami"><strong>{{ jami_soat }}</strong></td>
+        <td></td>
       </tr>
     </tfoot>
     {% endif %}

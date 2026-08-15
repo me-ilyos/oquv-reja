@@ -32,7 +32,9 @@ class OfficeAdminTalabMixin(RolTalabMixin):
 
 
 class OqituvchiTalabMixin(RolTalabMixin):
-    ruxsat_etilgan_rollar = (Rol.TEACHER,)
+    """Own-workload pages: teachers, and department heads (who also teach)."""
+
+    ruxsat_etilgan_rollar = (Rol.TEACHER, Rol.DEPARTMENT_ADMIN)
 
 
 class KafedraMudiriTalabMixin(RolTalabMixin):

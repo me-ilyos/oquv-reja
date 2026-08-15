@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Sum
 
 from accounts.models import Department, OqituvchiProfil
@@ -170,6 +171,78 @@ def yuklama_kamomadi(
         for o in oqituvchilar
     ]
     return sorted(holatlar, key=lambda h: h.kamomad, reverse=True)
+
+
+@dataclass(frozen=True)
+class SemestrTahrir:
+    """One office edit to a FanSemestr's classroom-hour split."""
+
+    fan_semestr_id: int
+    maruza_soat: int
+    amaliyot_soat: int
+    laboratoriya_soat: int
+    seminar_soat: int
+    kurs_ishi_bor: bool
+
+
+_TAHRIR_MAYDONLARI = {
+    SoatTuri.MARUZA: "maruza_soat",
+    SoatTuri.AMALIYOT: "amaliyot_soat",
+    SoatTuri.LABORATORIYA: "laboratoriya_soat",
+    SoatTuri.SEMINAR: "seminar_soat",
+}
+
+
+@transaction.atomic
+def semestrovka_yangilash(reja: OquvReja, tahrirlar: list[SemestrTahrir]) -> None:
+    """Persist office edits to a reja's per-semester hour split.
+
+    Only the four classroom-hour fields and the kurs-ishi flag change; weekly
+    hours and credits stay as parsed. A type cannot be zeroed (nor the kurs-ishi
+    flag cleared) while a teacher is delegated that work; every touched yuklama's
+    cached hours are refreshed to the new figures.
+    """
+    idlar = [t.fan_semestr_id for t in tahrirlar]
+    semestrlar = {
+        fs.pk: fs
+        for fs in FanSemestr.objects.filter(pk__in=idlar, variant__fan__reja=reja)
+    }
+    for tahrir in tahrirlar:
+        fs = semestrlar.get(tahrir.fan_semestr_id)
+        if fs is None:
+            raise ValidationError("Semestr bu rejaga tegishli emas.")
+        _semestrni_tahrirlash(fs, tahrir)
+
+
+def _semestrni_tahrirlash(fs: FanSemestr, tahrir: SemestrTahrir) -> None:
+    yangi = {
+        SoatTuri.MARUZA: tahrir.maruza_soat,
+        SoatTuri.AMALIYOT: tahrir.amaliyot_soat,
+        SoatTuri.LABORATORIYA: tahrir.laboratoriya_soat,
+        SoatTuri.SEMINAR: tahrir.seminar_soat,
+    }
+    _band_soatni_himoyalash(fs, yangi, tahrir.kurs_ishi_bor)
+    for tur, maydon in _TAHRIR_MAYDONLARI.items():
+        setattr(fs, maydon, yangi[tur])
+    fs.kurs_ishi_bor = tahrir.kurs_ishi_bor
+    fs.save(update_fields=[*_TAHRIR_MAYDONLARI.values(), "kurs_ishi_bor"])
+    for yuklama in fs.yuklamalar.all():
+        yuklama.save(update_fields=["soat"])
+
+
+def _band_soatni_himoyalash(
+    fs: FanSemestr, yangi: dict[str, int], kurs_ishi_bor: bool
+) -> None:
+    """Refuse edits that would strip hours a teacher is already delegated."""
+    band_turlar = set(fs.yuklamalar.values_list("tur", flat=True))
+    for tur in _TAHRIR_MAYDONLARI:
+        if yangi[tur] == 0 and tur in band_turlar:
+            raise ValidationError(
+                f"{SoatTuri(tur).label}: soat 0 ga o'zgartirilmaydi — "
+                "yuklama taqsimlangan."
+            )
+    if not kurs_ishi_bor and SoatTuri.KURS_ISHI in band_turlar:
+        raise ValidationError("Kurs ishi olib tashlanmaydi — yuklama taqsimlangan.")
 
 
 def variantni_tanlash(fan: Fan, variant: FanVariant) -> None:

@@ -1,0 +1,55 @@
+{% load ui %}
+{% comment %}Per-semester breakdown for the selected academic year: one row per
+FanSemestr active in the year. Curriculum hours in the cells; per-group demand
+in the tooltips. Read-only — kafedra assignment stays on the aggregated table.
+Shares the parent Alpine scope (qidiruv/faqat) for search and filtering.{% endcomment %}
+<table>
+  <thead>
+    <tr>
+      <th class="col-idx">№</th>
+      <th class="col-code">Kod</th>
+      <th class="col-name">Fan</th>
+      <th>Yo'nalish</th>
+      <th>Semestr</th>
+      <th class="sem-h">Ma'ruza</th>
+      <th class="sem-h">Amaliyot</th>
+      <th class="sem-h">Lab.</th>
+      <th class="sem-h">Seminar</th>
+      <th class="sem-h">Kurs ishi</th>
+      <th class="assign-cell">Kafedra</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for satr in fan_satrlari %}
+    {% for fs in satr.fan_semestrlar %}
+    <tr data-nomi="{{ satr.variant.nomi|lower }} {{ satr.variant.kodi|lower }}"
+        data-biriktirilmagan="{% if satr.biriktirilmagan %}1{% else %}0{% endif %}"
+        class="{% if satr.biriktirilmagan %}qator-biriktirilmagan{% endif %}"
+        x-show="(!faqat || $el.dataset.biriktirilmagan === '1') && (qidiruv === '' || $el.dataset.nomi.includes(qidiruv.toLowerCase()))">
+      <td class="col-idx">{% if forloop.first %}{{ satr.fan.raqam }}{% endif %}</td>
+      <td class="col-code"><span class="code">{% if forloop.first %}{% if satr.tanlanmagan %}—{% else %}{{ satr.variant.kodi|default:"—" }}{% endif %}{% endif %}</span></td>
+      <td class="col-name">
+        {% if forloop.first %}
+        {% if satr.tanlanmagan %}Tanlov fani (variant tanlanmagan){% else %}{{ satr.variant.nomi }}{% endif %}
+        {% if satr.fan.turi == "MAJBURIY" %}<span class="tag tag-mand">MAJ</span>{% else %}<span class="tag tag-elec">TAN</span>{% endif %}
+        {% endif %}
+      </td>
+      <td>{% if forloop.first %}<span class="code" title="{{ satr.fan.reja }}">{{ satr.fan.reja.yonalish_kodi }}</span>{% endif %}</td>
+      <td><strong>S{{ fs.semestr }}</strong></td>
+      {% include "web/office/_soat_breakdown_hujayralari.html" with fs=fs guruhlar_soni=satr.fan.reja.guruhlar_soni %}
+      <td class="assign-cell">
+        {% if forloop.first %}
+        {% if satr.kafedra %}
+        <span class="teacher-chip"><span class="avatar">{{ satr.kafedra.nomi|bosh_harflar }}</span>{{ satr.kafedra.nomi }}</span>
+        {% else %}
+        <span class="teacher-chip empty">Biriktirilmagan</span>
+        {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% empty %}
+    <tr><td colspan="11"><div class="empty-state">Bu o'quv yilida fanlar topilmadi.</div></td></tr>
+    {% endfor %}
+  </tbody>
+</table>

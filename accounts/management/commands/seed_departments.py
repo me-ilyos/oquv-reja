@@ -31,6 +31,8 @@ DEPARTMENT_NAMES = [
 
 DEFAULT_PASSWORD = "Oquvreja2026!"
 PHONE_PREFIX = "+99890"
+# Clear of the teacher range, which runs to +99890 0000603 (index*100 + offset).
+OFFICE_ADMIN_PHONE = "+998909999999"
 
 
 class Command(BaseCommand):
@@ -44,12 +46,29 @@ class Command(BaseCommand):
             )
 
         with transaction.atomic():
+            self._seed_office_admin()
             for index, nomi in enumerate(DEPARTMENT_NAMES):
                 self._seed_department(nomi, index, turlari)
 
         self.stdout.write(self.style.SUCCESS("Done."))
         self.stdout.write(
             f"Default password for all seeded teachers: {DEFAULT_PASSWORD}"
+        )
+
+    def _seed_office_admin(self) -> None:
+        if Foydalanuvchi.objects.filter(telefon=OFFICE_ADMIN_PHONE).exists():
+            self.stdout.write(f"Skipped (exists): office admin {OFFICE_ADMIN_PHONE}")
+            return
+
+        Foydalanuvchi.objects.create_user(
+            telefon=OFFICE_ADMIN_PHONE,
+            password=DEFAULT_PASSWORD,
+            first_name="Ofis",
+            last_name="Admin",
+            rol=Rol.OFFICE_ADMIN,
+        )
+        self.stdout.write(
+            self.style.SUCCESS(f"Created: office admin ({OFFICE_ADMIN_PHONE})")
         )
 
     def _seed_department(

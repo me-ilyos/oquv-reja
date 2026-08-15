@@ -1,0 +1,33 @@
+{% if request.session.dev_asl_foydalanuvchi %}
+  <form method="post" action="{% url 'dev:qaytish' %}" class="menu-qaytish">
+    {% csrf_token %}
+    <button type="submit" class="menu-item">← Asl hisobga qaytish</button>
+  </form>
+{% endif %}
+
+<div class="menu-group">
+  <div class="menu-group-nomi">Ofis</div>
+  {% for f in ofis_adminlar %}
+    {% include "web/parts/_rol_qatori.html" with nishon=f izoh=f.get_rol_display %}
+  {% empty %}
+    <div class="menu-bosh-joy">Ofis admin yo'q</div>
+  {% endfor %}
+</div>
+
+<div class="menu-group">
+  <div class="menu-group-nomi">Kafedra mudirlari</div>
+  {% for kafedra in kafedralar %}
+    {% include "web/parts/_rol_qatori.html" with nishon=kafedra.mudir.foydalanuvchi izoh=kafedra.nomi %}
+  {% empty %}
+    <div class="menu-bosh-joy">Mudir tayinlanmagan</div>
+  {% endfor %}
+</div>
+
+<div class="menu-group">
+  <div class="menu-group-nomi">O'qituvchilar</div>
+  {% for profil in oqituvchilar %}
+    {% include "web/parts/_rol_qatori.html" with nishon=profil.foydalanuvchi izoh=profil.kafedra.nomi soat=profil.jami_soat norma=profil.turi.min_soat %}
+  {% empty %}
+    <div class="menu-bosh-joy">O'qituvchi yo'q</div>
+  {% endfor %}
+</div>

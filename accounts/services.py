@@ -9,8 +9,14 @@ from accounts.models import (
     OqituvchiProfil,
     OqituvchiTuri,
     Rol,
+    Universitet,
 )
 from accounts.phone import normalize_phone
+
+
+def universitet_olish() -> Universitet | None:
+    """The single institution row, or None until an admin creates it."""
+    return Universitet.objects.first()
 
 
 @transaction.atomic

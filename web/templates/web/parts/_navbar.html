@@ -10,14 +10,25 @@
       <a class="nav-link {% if request.resolver_match.view_name == 'kafedra:dashboard' %}active{% endif %}" href="{% url 'kafedra:dashboard' %}">Boshqaruv paneli</a>
       <a class="nav-link {% if 'oqituvchi' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'kafedra:oqituvchi_list' %}">O'qituvchilar</a>
       <a class="nav-link {% if request.resolver_match.view_name == 'kafedra:hisobot' %}active{% endif %}" href="{% url 'kafedra:hisobot' %}">Hisobot</a>
+      <a class="nav-link {% if request.resolver_match.view_name == 'men:yuklamalar' %}active{% endif %}" href="{% url 'men:yuklamalar' %}">Mening yuklamam</a>
     {% elif user.is_teacher %}
       <a class="nav-link {% if request.resolver_match.view_name == 'men:yuklamalar' %}active{% endif %}" href="{% url 'men:yuklamalar' %}">Mening yuklamam</a>
     {% endif %}
     <span class="spacer"></span>
-    <span class="user">{{ user.get_full_name }}</span>
+    <button type="button" class="density-toggle" title="Jadval zichligi"
+      onclick="var r=document.documentElement,z=r.dataset.density==='compact'?'comfortable':'compact';r.dataset.density=z;localStorage.setItem('zichlik',z);this.querySelector('.density-label').textContent=z==='compact'?'Ixcham':'Keng';">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <span class="density-label">Zichlik</span>
+    </button>
+    {% if debug_rejim %}
+      {% include "web/parts/_rol_almashtirgich.html" %}
+    {% else %}
+      <span class="user">{{ user.get_full_name }}</span>
+    {% endif %}
     <form method="post" action="{% url 'chiqish' %}">
       {% csrf_token %}
       <button type="submit" class="logout-btn">Chiqish</button>
     </form>
   </div>
 </nav>
+<script>(function(){var l=document.querySelector('.density-label');if(l)l.textContent=document.documentElement.dataset.density==='compact'?'Ixcham':'Keng';})();</script>

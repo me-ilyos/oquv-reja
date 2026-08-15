@@ -11,7 +11,7 @@ from plans.tests.factories import (
     make_oqituvchi,
     make_reja,
 )
-from web.tests.helpers import foydalanuvchi_yarat, login
+from web.tests.helpers import foydalanuvchi_yarat, login, mudir_yarat
 
 
 class MenYuklamalarimTests(TestCase):
@@ -63,3 +63,60 @@ class MenYuklamalarimTests(TestCase):
         login(self.client, foydalanuvchi_yarat(Rol.TEACHER))
         javob = self.client.get(reverse("men:yuklamalar"))
         self.assertContains(javob, "Profil biriktirilmagan")
+
+    def test_kafedra_mudiri_oz_yuklamasini_koradi(self) -> None:
+        mudir = mudir_yarat()
+        profil = mudir.oqituvchi_profil
+        reja = make_reja(yonalish_kodi="60610177", boshlanish_yili=self.joriy)
+        fan = make_fan(reja, kafedra=profil.kafedra)
+        fs = make_fan_semestr(fan.tanlangan_variant, semestr=1)
+        Yuklama.objects.create(fan_semestr=fs, tur=SoatTuri.MARUZA, oqituvchi=profil)
+        login(self.client, mudir)
+        javob = self.client.get(reverse("men:yuklamalar"))
+        self.assertEqual(javob.status_code, 200)
+        self.assertEqual(len(javob.context["yuklamalar"]), 1)
+
+
+class MenOquvDasturTests(TestCase):
+    def setUp(self) -> None:
+        self.joriy = joriy_akademik_yil()
+        self.maruza_egasi = make_oqituvchi()
+        reja = make_reja(boshlanish_yili=self.joriy)
+        fan = make_fan(reja, kafedra=self.maruza_egasi.kafedra)
+        self.variant = fan.tanlangan_variant
+        fs = make_fan_semestr(self.variant, semestr=1)
+        Yuklama.objects.create(
+            fan_semestr=fs, tur=SoatTuri.MARUZA, oqituvchi=self.maruza_egasi
+        )
+        self.url = reverse("men:dastur", args=[self.variant.pk])
+
+    def test_maruza_egasi_hujjatni_yuklab_oladi(self) -> None:
+        login(self.client, self.maruza_egasi.foydalanuvchi)
+        javob = self.client.get(self.url)
+        self.assertEqual(javob.status_code, 200)
+        self.assertEqual(
+            javob["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+    def test_begona_oqituvchi_rad_etiladi(self) -> None:
+        begona = make_oqituvchi(kafedra=self.maruza_egasi.kafedra)
+        login(self.client, begona.foydalanuvchi)
+        javob = self.client.get(self.url)
+        self.assertEqual(javob.status_code, 403)
+
+    def test_tizimga_kirmagan_foydalanuvchi_qaytariladi(self) -> None:
+        javob = self.client.get(self.url)
+        self.assertEqual(javob.status_code, 302)
+
+    def test_kafedra_mudiri_ham_ozi_oqigan_dasturni_yaratadi(self) -> None:
+        mudir = mudir_yarat()
+        profil = mudir.oqituvchi_profil
+        reja = make_reja(yonalish_kodi="60610188", boshlanish_yili=self.joriy)
+        fan = make_fan(reja, kafedra=profil.kafedra)
+        variant = fan.tanlangan_variant
+        fs = make_fan_semestr(variant, semestr=1)
+        Yuklama.objects.create(fan_semestr=fs, tur=SoatTuri.MARUZA, oqituvchi=profil)
+        login(self.client, mudir)
+        javob = self.client.get(reverse("men:dastur", args=[variant.pk]))
+        self.assertEqual(javob.status_code, 200)

@@ -1,6 +1,13 @@
 {% extends "web/base.html" %}
 {% block title %}Rejani tahrirlash{% endblock %}
 {% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{% url 'office:reja_list' %}">O'quv rejalar</a>
+  <span class="sep">/</span>
+  <a href="{% url 'office:reja_detail' reja.pk %}">{{ reja.yonalish_kodi }}</a>
+  <span class="sep">/</span>
+  <span class="current">Tahrirlash</span>
+</nav>
 <div class="topbar">
   <div>
     <div class="title">{{ reja }}</div>
@@ -10,7 +17,38 @@
 <div class="card">
   <form method="post">
     {% csrf_token %}
-    {% include "web/parts/_form_maydonlari.html" %}
+    {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="form-section">
+      <div class="form-section-title">Bilim sohasi</div>
+      <div class="form-grid">
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.bilim_sohasi_kodi label="Kodi" %}</div>
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.bilim_sohasi_nomi label="Nomi" %}</div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Ta'lim sohasi</div>
+      <div class="form-grid">
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.talim_sohasi_kodi label="Kodi" %}</div>
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.talim_sohasi_nomi label="Nomi" %}</div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Yo'nalish</div>
+      <div class="form-grid">
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.yonalish_kodi label="Kodi" %}</div>
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.yonalish_nomi label="Nomi" %}</div>
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-field">{% include "web/parts/_maydon.html" with field=form.talabalar_soni %}</div>
+      <div class="form-field">{% include "web/parts/_maydon.html" with field=form.guruhlar_soni %}</div>
+      <div class="form-field">{% include "web/parts/_maydon.html" with field=form.guruh_prefiksi %}</div>
+    </div>
+
     <button type="submit" class="btn btn-primary">Saqlash</button>
     <a class="btn" href="{% url 'office:reja_detail' reja.pk %}">Bekor qilish</a>
   </form>

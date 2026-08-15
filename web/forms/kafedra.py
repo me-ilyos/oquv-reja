@@ -6,5 +6,5 @@ from accounts.models import Department
 class KafedraForm(forms.ModelForm):
     class Meta:
         model = Department
-        fields = ["nomi"]
-        labels = {"nomi": "Kafedra nomi"}
+        fields = ["nomi", "fakultet"]
+        labels = {"nomi": "Kafedra nomi", "fakultet": "Fakultet nomi"}

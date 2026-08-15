@@ -3,13 +3,24 @@
 from itertools import count
 
 from accounts.models import Department, Foydalanuvchi, OqituvchiProfil, OqituvchiTuri
-from plans.models import Fan, FanSemestr, FanTuri, FanVariant, Guruh, OquvReja
+from plans.models import (
+    Fan,
+    FanSemestr,
+    FanTuri,
+    FanVariant,
+    Guruh,
+    OquvReja,
+)
 
 _telefon_raqami = count(1)
 
 
 def make_reja(**kwargs: object) -> OquvReja:
     maydonlar: dict[str, object] = {
+        "bilim_sohasi_kodi": "6",
+        "bilim_sohasi_nomi": "Test bilim sohasi",
+        "talim_sohasi_kodi": "606",
+        "talim_sohasi_nomi": "Test ta'lim sohasi",
         "yonalish_kodi": "60610100",
         "yonalish_nomi": "Dasturiy injiniring",
         "boshlanish_yili": 2024,

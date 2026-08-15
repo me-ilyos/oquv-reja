@@ -8,7 +8,7 @@
   </div>
   <div class="controls">
     {% if yillar %}
-    <select name="yil" hx-get="{% url 'office:dashboard' %}" hx-target="#kontent" hx-swap="innerHTML" hx-push-url="true">
+    <select name="yil" hx-get="{% url 'office:dashboard' %}" hx-target="#kontent" hx-swap="innerHTML" hx-push-url="true" hx-indicator="#yuklanish">
       {% for y in yillar %}
       <option value="{{ y }}" {% if y == yil %}selected{% endif %}>{{ y }}/{{ y|add:1 }} o'quv yili</option>
       {% endfor %}
@@ -16,11 +16,14 @@
     {% endif %}
   </div>
 </div>
-<div id="kontent">
-  {% if yil %}
-    {% include "web/office/_dashboard_kontent.html" %}
-  {% else %}
-    <div class="empty-state">Joriy yoki kelgusi yillar uchun o'quv reja topilmadi. Avval reja import qiling.</div>
-  {% endif %}
+<div style="position:relative;">
+  <div id="yuklanish" class="skeleton-overlay htmx-indicator">{% include "web/parts/_skeleton_jadval.html" %}</div>
+  <div id="kontent">
+    {% if yil %}
+      {% include "web/office/_dashboard_kontent.html" %}
+    {% else %}
+      <div class="empty-state">Joriy yoki kelgusi yillar uchun o'quv reja topilmadi. Avval reja import qiling.</div>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

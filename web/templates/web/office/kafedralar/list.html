@@ -20,24 +20,32 @@
     <a class="btn btn-primary" href="{% url 'office:kafedra_yangi' %}">+ Yangi kafedra</a>
   </div>
 </div>
-<div class="table-wrap narrow">
-  <table>
-    <thead>
-      <tr>
-        <th>Kafedra</th>
-        <th>Mudir</th>
-        <th>O'qituvchilar</th>
-        <th>Biriktirilgan soat</th>
-        <th>Taqsimlangan soat</th>
-        <th style="min-width:120px;">Qamrov</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for q in qamrovlar %}
-      <tr>
-        <td><strong>{{ q.kafedra.nomi }}</strong></td>
-        <td class="assign-cell cell-relative" x-data="{ ochiq: false }" @click.outside="ochiq = false">
+<div x-data="{ qidiruv: '' }">
+  <div class="controls" style="margin-bottom:10px;">
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" placeholder="Kafedra nomi" x-model="qidiruv">
+    </div>
+  </div>
+  <div class="table-wrap narrow cards">
+    <table>
+      <thead>
+        <tr>
+          <th>Kafedra</th>
+          <th>Mudir</th>
+          <th class="num">O'qituvchilar</th>
+          <th class="num">Biriktirilgan soat</th>
+          <th class="num">Taqsimlangan soat</th>
+          <th style="min-width:120px;">Qamrov</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for q in qamrovlar %}
+        <tr data-nomi="{{ q.kafedra.nomi|lower }}"
+            x-show="qidiruv === '' || $el.dataset.nomi.includes(qidiruv.toLowerCase())">
+          <td data-label="Kafedra"><strong>{{ q.kafedra.nomi }}</strong></td>
+          <td data-label="Mudir" class="assign-cell cell-relative" x-data="{ ochiq: false }" @click.outside="ochiq = false">
           {% if q.kafedra.mudir %}
           <button type="button" class="teacher-chip" @click="ochiq = !ochiq">
             <span class="avatar">{{ q.kafedra.mudir|stringformat:"s"|bosh_harflar }}</span>{{ q.kafedra.mudir }}
@@ -64,10 +72,10 @@
             {% endif %}
           </div>
         </td>
-        <td>{{ q.oqituvchilar_soni }}</td>
-        <td>{{ q.biriktirilgan_soat }}</td>
-        <td>{{ q.taqsimlangan_soat }}</td>
-        <td>
+        <td class="num" data-label="O'qituvchilar">{{ q.oqituvchilar_soni }}</td>
+        <td class="num" data-label="Biriktirilgan soat">{{ q.biriktirilgan_soat }}</td>
+        <td class="num" data-label="Taqsimlangan soat">{{ q.taqsimlangan_soat }}</td>
+        <td data-label="Qamrov">
           {% with f=q.taqsimlangan_soat|foiz:q.biriktirilgan_soat %}
           <div class="progress" title="{{ f }}%"><div class="fill {% if f < 100 %}warn{% endif %}" style="width:{{ f }}%;"></div></div>
           {% endwith %}
@@ -85,5 +93,6 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endblock %}

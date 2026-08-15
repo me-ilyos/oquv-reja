@@ -23,6 +23,7 @@ from web.views.office.rejalar import (
     RejaImportView,
     RejaListView,
     RejaTahrirView,
+    semestrovka_saqlash,
 )
 
 urlpatterns = [
@@ -33,6 +34,11 @@ urlpatterns = [
     path("rejalar/yangi/", RejaImportView.as_view(), name="reja_yangi"),
     path("rejalar/<int:pk>/", RejaDetailView.as_view(), name="reja_detail"),
     path("rejalar/<int:pk>/tahrir/", RejaTahrirView.as_view(), name="reja_tahrir"),
+    path(
+        "rejalar/<int:pk>/semestrovka/",
+        semestrovka_saqlash,
+        name="semestrovka_saqlash",
+    ),
     path("kafedralar/", KafedraListView.as_view(), name="kafedra_list"),
     path("kafedralar/yangi/", KafedraYangiView.as_view(), name="kafedra_yangi"),
     path(
