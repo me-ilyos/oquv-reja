@@ -4,8 +4,14 @@ Deploys this Django app behind Gunicorn + Nginx. Another app on this VPS
 already uses port 8000, so Gunicorn here binds to **127.0.0.1:8001** instead —
 adjust if 8001 is also taken (`sudo ss -ltnp`).
 
-Replace `example.com` and `/srv/oquv_reja` below with your actual domain and
-path.
+No domain is assumed. Nginx listens on **port 8080** (also check it's free
+with `sudo ss -ltnp`) with `server_name _;` — a catch-all that serves any
+request regardless of hostname — so the app is reached at
+`http://YOUR_VPS_IP:8080/`. This is a separate Nginx server block from
+whatever serves the other app; it doesn't touch that config.
+
+Replace `/srv/oquv_reja` and `YOUR_VPS_IP` below with your actual path and
+server IP.
 
 ## 1. System packages
 
@@ -43,10 +49,16 @@ pip install -r requirements.txt
 cat > .env <<'EOF'
 SECRET_KEY=replace-with-a-long-random-value
 DEBUG=False
-ALLOWED_HOSTS=example.com,www.example.com
+ALLOWED_HOSTS=YOUR_VPS_IP
+CSRF_TRUSTED_ORIGINS=http://YOUR_VPS_IP:8080
 EOF
 chmod 600 .env
 ```
+
+`CSRF_TRUSTED_ORIGINS` must include the full scheme + host + port you're
+serving from (`http://YOUR_VPS_IP:8080`, not just the bare IP) — Django
+checks login/POST requests' `Origin` header against this list separately
+from `ALLOWED_HOSTS`, and rejects them with a 403 if it's missing.
 
 Generate a secret key:
 
@@ -106,14 +118,14 @@ sudo systemctl status oquv_reja
 
 ## 7. Nginx reverse proxy
 
-Create a new server block (separate file so it doesn't touch the existing
-app's config):
+Create a new server block file — it's independent of whatever config serves
+the other app, so this won't disturb it:
 
 ```bash
 sudo tee /etc/nginx/sites-available/oquv_reja > /dev/null <<'EOF'
 server {
-    listen 80;
-    server_name example.com www.example.com;
+    listen 8080;
+    server_name _;
 
     location /static/ {
         alias /srv/oquv_reja/staticfiles/;
@@ -138,31 +150,31 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-If this app doesn't have its own domain, route it by path on the existing
-server block instead (e.g. `location /reja/ { proxy_pass
-http://127.0.0.1:8001/; }` on the site that already listens on 80/443), and
-set `FORCE_SCRIPT_NAME`/adjust `STATIC_URL` accordingly — ask before doing
-this since it means editing the other app's Nginx config.
+`server_name _;` means "match any Host header" — there's no domain to match
+against, so this block just handles everything that arrives on port 8080.
+Visit `http://YOUR_VPS_IP:8080/` to confirm it's serving.
+
+If you get a domain later, swap `server_name _;` for the real domain,
+`listen 8080` back to `listen 80;`, and see the HTTPS note below.
 
 ## 8. Firewall
 
-Only Nginx needs to be reachable from outside; Gunicorn stays on localhost.
+Nginx's new port needs to be reachable from outside; Gunicorn stays on
+localhost.
 
 ```bash
-sudo ufw allow 'Nginx Full'
+sudo ufw allow 8080/tcp
 sudo ufw status
 ```
 
-Do **not** open port 8001 externally.
+Do **not** open port 8001 externally — only Nginx (8080) should be exposed.
 
-## 9. HTTPS (optional but recommended)
+## 9. HTTPS
 
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d example.com -d www.example.com
-```
-
-Certbot edits the Nginx block above and sets up auto-renewal.
+Skipped for now — Let's Encrypt/certbot issues certificates for domain
+names, not bare IPs, so TLS isn't available until you point a domain at
+this server. Revisit this once you have one; at that point switch Nginx
+back to port 80/443 and run `certbot --nginx -d your-domain`.
 
 ## 10. Deploying updates
 
