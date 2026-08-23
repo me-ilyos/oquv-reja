@@ -55,22 +55,30 @@ class ImportNatija:
     ogohlantirishlar: list[str]
 
 
-def parse_xlsx(path: Path, boshlanish_yili: int | None = None) -> ParsedReja:
+def parse_xlsx(
+    path: Path,
+    boshlanish_yili: int | None = None,
+    *,
+    yonalish_kodi: str | None = None,
+    yonalish_nomi: str | None = None,
+    talim_shakli: str | None = None,
+    daraja: str | None = None,
+) -> ParsedReja:
     ws = openpyxl.load_workbook(path, data_only=True).active
     direction = resolve_direction(ws)
     if direction is None or not direction[0]:
         raise ImportXato("yo'nalish kodi topilmadi — reja identifikatsiya qilinmaydi")
     if boshlanish_yili is None:
         boshlanish_yili = _varaqdagi_boshlanish_yili(ws)
-    daraja, davomiylik_matni, talim_shakli = read_metadata(ws)
+    varaqdagi_daraja, davomiylik_matni, varaqdagi_shakl = read_metadata(ws)
     layout, semester_map, weekly_map = detect_sheet_layout(ws)
     return ParsedReja(
-        yonalish_kodi=direction[0],
-        yonalish_nomi=_bir_qatorga(direction[1], 255),
+        yonalish_kodi=yonalish_kodi or direction[0],
+        yonalish_nomi=yonalish_nomi or _bir_qatorga(direction[1], 255),
         boshlanish_yili=boshlanish_yili,
-        daraja=_bir_qatorga(daraja, 100),
+        daraja=daraja or _bir_qatorga(varaqdagi_daraja, 100),
         davomiylik_yil=_davomiylik_yillari(davomiylik_matni),
-        talim_shakli=_bir_qatorga(talim_shakli, 100),
+        talim_shakli=talim_shakli or _bir_qatorga(varaqdagi_shakl, 100),
         fayl_nomi=path.name,
         core=parse_core_courses(ws, layout, semester_map, weekly_map),
         slots=parse_selective_courses(ws, layout, semester_map, weekly_map),

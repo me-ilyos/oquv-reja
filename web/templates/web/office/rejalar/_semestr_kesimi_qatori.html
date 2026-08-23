@@ -1,0 +1,71 @@
+{% load ui %}
+<tr class="{% if satr.biriktirilmagan %}qator-biriktirilmagan{% endif %}">
+  <td class="col-idx">{{ satr.fan.raqam }}</td>
+  <td class="col-code"><span class="code">{{ satr.variant.kodi|default:"—" }}</span></td>
+  <td class="col-name">
+    {{ satr.variant.nomi }}
+    {% if satr.fan.turi == "MAJBURIY" %}<span class="tag tag-mand">MAJBURIY</span>{% else %}<span class="tag tag-elec">TANLOV</span>{% endif %}
+    {% if satr.tanlanmagan %}<span class="tag tag-elec">TANLANMAGAN</span>{% endif %}
+  </td>
+  <td class="credits num">{% if satr.fan_semestr.kredit %}{{ satr.fan_semestr.kredit }} kr{% else %}—{% endif %}</td>
+  <td class="num">{% if satr.fan_semestr.maruza_soat %}{{ satr.fan_semestr.maruza_soat }}{% else %}—{% endif %}</td>
+  <td class="num">{% if satr.fan_semestr.amaliyot_soat %}{{ satr.fan_semestr.amaliyot_soat }}{% else %}—{% endif %}</td>
+  <td class="num">{% if satr.fan_semestr.laboratoriya_soat %}{{ satr.fan_semestr.laboratoriya_soat }}{% else %}—{% endif %}</td>
+  <td class="num">{% if satr.fan_semestr.seminar_soat %}{{ satr.fan_semestr.seminar_soat }}{% else %}—{% endif %}</td>
+  <td class="num" style="text-align:center;">{% if satr.fan_semestr.kurs_ishi_bor %}✓{% else %}—{% endif %}</td>
+  <td class="assign-cell cell-relative" x-data="{ ochiq_k: false }" @click.outside="ochiq_k = false">
+    {% if satr.tanlanmagan %}
+    <button type="button" class="teacher-chip empty" @click="ochiq_k = !ochiq_k">Variant tanlanmagan</button>
+    <div class="popover" x-show="ochiq_k" x-cloak>
+      {% for v in satr.fan.variantlar.all %}
+      <form method="post" action="{% url 'office:variant_tanlash' satr.fan.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="variant" value="{{ v.pk }}">
+        <input type="hidden" name="redirect" value="{% url 'office:reja_detail' reja.pk %}?tab=semestr">
+        <button type="submit" class="opt">{{ v.nomi }}</button>
+      </form>
+      {% endfor %}
+    </div>
+    {% else %}
+    {% if satr.kafedra %}
+    <button type="button" class="teacher-chip" @click="ochiq_k = !ochiq_k">
+      <span class="avatar">{{ satr.kafedra.nomi|bosh_harflar }}</span>{{ satr.kafedra.nomi }}
+    </button>
+    {% else %}
+    <button type="button" class="teacher-chip empty" @click="ochiq_k = !ochiq_k">+ Kafedra biriktirish</button>
+    {% endif %}
+    <div class="popover" x-show="ochiq_k" x-cloak>
+      {% for k in kafedralar %}
+      <form method="post" action="{% url 'office:kafedra_biriktirish' satr.variant.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="kafedra" value="{{ k.pk }}">
+        <input type="hidden" name="redirect" value="{% url 'office:reja_detail' reja.pk %}?tab=semestr">
+        <button type="submit" class="opt"><span class="avatar">{{ k.nomi|bosh_harflar }}</span>{{ k.nomi }}</button>
+      </form>
+      {% endfor %}
+      {% if satr.kafedra %}
+      <form method="post" action="{% url 'office:kafedra_biriktirish' satr.variant.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="kafedra" value="">
+        <input type="hidden" name="redirect" value="{% url 'office:reja_detail' reja.pk %}?tab=semestr">
+        <button type="submit" class="opt clear">Biriktirishni bekor qilish</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </td>
+  <td class="assign-cell cell-relative" x-data="{ ochiq_o: false }" @click.outside="ochiq_o = false">
+    {% if satr.taqsimlangan %}
+    <button type="button" class="teacher-chip status ok" @click="ochiq_o = !ochiq_o">Taqsimlangan</button>
+    {% else %}
+    <button type="button" class="teacher-chip status warn" @click="ochiq_o = !ochiq_o">Taqsimlanmagan</button>
+    {% endif %}
+    <div class="popover" x-show="ochiq_o" x-cloak>
+      {% for y in satr.yuklamalar %}
+      <div class="opt" style="cursor:default;">{{ y.tur_matni }}: {{ y.oqituvchi }}{% if y.guruh %} ({{ y.guruh.nomi }}){% endif %}</div>
+      {% empty %}
+      <div class="opt" style="cursor:default;">Hali hech kim taqsimlanmagan</div>
+      {% endfor %}
+    </div>
+  </td>
+</tr>

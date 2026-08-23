@@ -26,6 +26,10 @@ class YuklashParametrlari:
     guruh_prefiksi: str
     boshlanish_yili: int | None
     replace: bool
+    yonalish_kodi: str = ""
+    yonalish_nomi: str = ""
+    talim_shakli: str = ""
+    daraja: str = ""
 
 
 def fayldan_import_qilish(
@@ -38,7 +42,14 @@ def fayldan_import_qilish(
     """
     yol = _faylni_saqlash(fayl)
     try:
-        parsed = parse_xlsx(yol, parametrlar.boshlanish_yili)
+        parsed = parse_xlsx(
+            yol,
+            parametrlar.boshlanish_yili,
+            yonalish_kodi=parametrlar.yonalish_kodi or None,
+            yonalish_nomi=parametrlar.yonalish_nomi or None,
+            talim_shakli=parametrlar.talim_shakli or None,
+            daraja=parametrlar.daraja or None,
+        )
     except BadZipFile as xato:
         raise ImportXato("fayl .xlsx formatida emas yoki buzilgan") from xato
     with transaction.atomic():

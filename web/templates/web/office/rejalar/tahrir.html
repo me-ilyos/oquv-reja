@@ -11,7 +11,6 @@
 <div class="topbar">
   <div>
     <div class="title">{{ reja }}</div>
-    <div class="subtitle">Talabalar va guruhlar sonini kiriting — soat talablari shu asosda hisoblanadi</div>
   </div>
 </div>
 <div class="card">
@@ -40,6 +39,14 @@
       <div class="form-grid">
         <div class="form-field">{% include "web/parts/_maydon.html" with field=form.yonalish_kodi label="Kodi" %}</div>
         <div class="form-field">{% include "web/parts/_maydon.html" with field=form.yonalish_nomi label="Nomi" %}</div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Ta'lim shakli va bosqich</div>
+      <div class="form-grid">
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.talim_shakli %}</div>
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.daraja %}</div>
       </div>
     </div>
 
