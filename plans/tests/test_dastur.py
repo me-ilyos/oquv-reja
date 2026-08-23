@@ -2,7 +2,9 @@ from django.test import TestCase
 
 from accounts.models import Department, Universitet
 from plans import dashboard
-from plans.dastur.service import dastur_egasimi, dastur_kontekst, dastur_render
+from plans.dastur.kontekst import dastur_kontekst
+from plans.dastur.mavzular import bosh_mavzular
+from plans.dastur.service import dastur_egasimi, dastur_render
 from plans.models import SoatTuri, Yuklama
 from plans.tests.factories import (
     make_fan,
@@ -11,6 +13,24 @@ from plans.tests.factories import (
     make_oqituvchi,
     make_reja,
 )
+
+
+class BoshMavzularTest(TestCase):
+    def test_soat_ikkiga_bolinadi(self) -> None:
+        mavzular = bosh_mavzular(32, "M")
+        self.assertEqual(len(mavzular), 16)
+        self.assertEqual(mavzular[0].code, "M1")
+        self.assertEqual(mavzular[-1].code, "M16")
+        self.assertTrue(all(m.hours == 2 and m.title == "" for m in mavzular))
+
+    def test_toq_soat_qoldiq_qatori(self) -> None:
+        mavzular = bosh_mavzular(5, "A")
+        self.assertEqual([m.hours for m in mavzular], [2, 2, 1])
+        self.assertEqual(mavzular[-1].code, "A3")
+
+    def test_nol_soat_bosh_royxat(self) -> None:
+        self.assertEqual(bosh_mavzular(0, "L"), [])
+        self.assertEqual(bosh_mavzular(-4, "S"), [])
 
 
 class DasturEgasimiTest(TestCase):
@@ -70,8 +90,12 @@ class DasturKontekstTest(TestCase):
         self.kafedra = Department.objects.create(
             nomi="Matematika", fakultet="Aniq fanlar fakulteti"
         )
-        reja = make_reja(boshlanish_yili=self.yil)
-        fan = make_fan(reja, raqam="1.05", kafedra=self.kafedra)
+        reja = make_reja(
+            boshlanish_yili=self.yil,
+            bilim_sohasi_kodi="600000",
+            bilim_sohasi_nomi="Aniq fanlar",
+        )
+        fan = make_fan(reja, raqam="1.05", kafedra=self.kafedra, jami_soat=120)
         self.variant = fan.tanlangan_variant
         self.fs = make_fan_semestr(self.variant, semestr=1)
         self.maruza_egasi = make_oqituvchi(kafedra=self.kafedra)
@@ -90,34 +114,62 @@ class DasturKontekstTest(TestCase):
     def test_malumot_maydonlari_toldiriladi(self) -> None:
         kontekst = dastur_kontekst(self.variant)
         self.assertEqual(kontekst["university"], "Test universiteti")
-        self.assertEqual(kontekst["faculty"], "Aniq fanlar fakulteti")
         self.assertEqual(kontekst["kafedra"], "Matematika")
         self.assertEqual(kontekst["course"]["code"], self.variant.kodi)
         self.assertEqual(kontekst["course"]["name"], self.variant.nomi)
-        self.assertEqual(kontekst["plan_number"], "1.05")
-        self.assertEqual(kontekst["total_hours"], self.variant.fan.jami_soat)
-        self.assertEqual(kontekst["classroom_total"], self.variant.auditoriya_soat)
-        self.assertEqual(kontekst["hours"]["lecture"], self.variant.maruza_soat)
+        self.assertEqual(
+            kontekst["plan_number"], f"{self.variant.fan.reja.yonalish_kodi}-1.05"
+        )
+        self.assertEqual(kontekst["major"]["bilim_sohasi"], "600000 – Aniq fanlar")
+        self.assertEqual(kontekst["total_hours"], str(self.variant.fan.jami_soat))
+        self.assertEqual(kontekst["classroom_total"], str(self.variant.auditoriya_soat))
+        self.assertEqual(kontekst["hours"]["lecture"], str(self.variant.maruza_soat))
         self.assertEqual(kontekst["semesters_str"], "1")
         self.assertEqual(kontekst["credits_str"], str(self.fs.kredit))
 
-    def test_mualliflar_maruza_egasi_birinchi(self) -> None:
+    def test_nol_soat_chiziqcha_bilan_korsatiladi(self) -> None:
         kontekst = dastur_kontekst(self.variant)
-        self.assertEqual(len(kontekst["authors"]), 2)
-        self.assertIn(str(self.maruza_egasi.foydalanuvchi), kontekst["authors"][0])
+        self.assertEqual(kontekst["hours"]["seminar"], "-")
+        self.assertEqual(kontekst["hours"]["coursework"], "-")
 
-    def test_manba_yoq_maydonlar_bosh(self) -> None:
+    def test_mustaqil_talim_hisoblanadi(self) -> None:
         kontekst = dastur_kontekst(self.variant)
-        self.assertEqual(kontekst["reviewers"], [])
-        self.assertEqual(kontekst["purpose"], "")
-        self.assertEqual(kontekst["lectures"], [])
-        self.assertEqual(kontekst["literature"]["main"], [])
+        kutilgan = self.variant.fan.jami_soat - self.variant.auditoriya_soat
+        self.assertEqual(kontekst["hours"]["self_study"], str(kutilgan))
+
+    def test_mavzular_soatdan_hisoblanadi(self) -> None:
+        kontekst = dastur_kontekst(self.variant)
+        self.assertEqual(len(kontekst["lectures"]), self.variant.maruza_soat // 2)
+        self.assertEqual(kontekst["practicals"][0].code, "A1")
+        self.assertEqual(len(kontekst["labs"]), self.variant.laboratoriya_soat // 2)
+        self.assertEqual(kontekst["seminars"], [])
+
+    def test_kop_semestrli_oquv_yillari_takrorlanmaydi(self) -> None:
+        make_fan_semestr(self.variant, semestr=2)
+        kontekst = dastur_kontekst(self.variant)
+        boshlanish = self.variant.fan.reja.boshlanish_yili
+        self.assertEqual(
+            kontekst["academic_years_str"], f"{boshlanish}/{boshlanish + 1}"
+        )
 
     def test_kengash_maydonlari_bosh_joy(self) -> None:
         kontekst = dastur_kontekst(self.variant)
-        self.assertEqual(kontekst["faculty_council"]["number"], "_____")
         self.assertEqual(kontekst["kafedra_council"]["date"], "_____")
 
     def test_render_hujjat_yaratadi(self) -> None:
         buffer = dastur_render(self.variant)
         self.assertGreater(len(buffer.getvalue()), 0)
+
+    def test_render_mavzu_qatorlari_hujjatga_kiradi(self) -> None:
+        from docx import Document
+
+        buffer = dastur_render(self.variant)
+        hujjat = Document(buffer)
+        matn = "\n".join(
+            cell.text
+            for table in hujjat.tables
+            for row in table.rows
+            for cell in row.cells
+        )
+        self.assertIn("M1", matn)
+        self.assertIn(f"M{self.variant.maruza_soat // 2}", matn)
