@@ -53,9 +53,14 @@ in an existing file.
 - Functions under ~40 lines; split otherwise.
 - Names over comments. Comments only for "why" (Excel-format quirks, non-obvious decisions), never for "what".
 
-## Git
-- Never commit to main. Branch per task: feat/, fix/, refactor/.
-- Commit after each verified checkpoint. Format: type(scope): imperative summary — why, not what, under 72 chars.
-- Never git add . — add named files only; review git status first.
-- Never push, merge, or force-push without my explicit instruction.
-- Never commit: source .xlsx files over 1MB, generated output .md, credentials, commented-out code.
+## Git rules
+- Never commit to main. One branch per task: feat/, fix/, refactor/.
+- Commit after each verified checkpoint (tests green).
+- Message format: type(scope): imperative summary of the change, under 72 chars.
+  Add a body explaining WHY when the reason isn't obvious.
+- Never `git add .` or `git add -A`. Run `git status`, then add named files only.
+- Never push, merge, rebase, or force-push. Ever. I do those myself.
+- Never commit commented-out code — delete it, git history keeps it.
+
+## Rules
+- After finishing a task, explain what you changed and why in 5 sentences max.
