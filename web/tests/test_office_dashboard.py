@@ -35,7 +35,7 @@ class DashboardKorinishTests(TestCase):
 
     def test_reja_yoq_bolsa_bosh_holat(self) -> None:
         javob = self.client.get(reverse("office:dashboard"))
-        self.assertContains(javob, "reja topilmadi")
+        self.assertContains(javob, "empty-state")
 
     def test_htmx_sorovi_partial_qaytaradi(self) -> None:
         fan = make_fan(self.reja)

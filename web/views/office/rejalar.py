@@ -61,6 +61,7 @@ class RejaDetailView(OfficeAdminTalabMixin, DetailView):
         context = super().get_context_data(**kwargs)
         reja = self.object
         satrlar = dashboard.reja_semestrovkasi(reja)
+        semestr_kesimi = dashboard.reja_semestr_kesimi(reja)
         context.update(
             {
                 "satrlar": satrlar,
@@ -69,6 +70,8 @@ class RejaDetailView(OfficeAdminTalabMixin, DetailView):
                 "semestr_raqamlari": range(1, reja.semestrlar_soni + 1),
                 "stat": dashboard.statlarni_hisoblash(services.taqsimot_hisoboti(reja)),
                 "kafedralar": Department.objects.order_by("nomi"),
+                "semestr_kesimi": semestr_kesimi,
+                "birinchi_semestr": min(semestr_kesimi, default=None),
             }
         )
         return context

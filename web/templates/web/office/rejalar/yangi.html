@@ -9,7 +9,6 @@
 <div class="topbar">
   <div>
     <div class="title">Yangi o'quv reja</div>
-    <div class="subtitle">Vazirlik Excel faylini yuklang — fanlar va semestrovka avtomatik hisoblanadi</div>
   </div>
 </div>
 <div class="card">
@@ -34,6 +33,16 @@
       <div class="form-grid">
         <div class="form-field">{% include "web/parts/_maydon.html" with field=form.talim_sohasi_kodi label="Kodi" %}</div>
         <div class="form-field">{% include "web/parts/_maydon.html" with field=form.talim_sohasi_nomi label="Nomi" %}</div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Fayldan boshqacha bo'lsa (ixtiyoriy)</div>
+      <div class="form-grid">
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.yonalish_kodi %}</div>
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.yonalish_nomi %}</div>
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.talim_shakli %}</div>
+        <div class="form-field">{% include "web/parts/_maydon.html" with field=form.daraja %}</div>
       </div>
     </div>
 

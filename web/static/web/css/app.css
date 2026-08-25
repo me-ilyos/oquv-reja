@@ -58,16 +58,14 @@ td { padding: 12px 8px; border-bottom: 1px solid var(--line); vertical-align: mi
 tbody tr:hover td { background: #f5f6f8; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
-/* Density: comfortable is the default above; compact restores the tight rhythm. */
-:root[data-density="compact"] td { padding: 6px 8px; }
-:root[data-density="compact"] thead th { padding: 7px 8px; }
-
 .col-idx { width: 34px; color: var(--muted); font-size: 12px; }
 .col-code { position: sticky; left: 0; background: var(--panel); z-index: 2; min-width: 96px; }
 tbody tr:hover .col-code { background: #f5f6f8; }
 .col-name { position: sticky; left: 96px; background: var(--panel); z-index: 2; min-width: 260px; box-shadow: 2px 0 0 0 var(--line); }
 tbody tr:hover .col-name { background: #f5f6f8; }
 thead .col-code, thead .col-name { background: #eef0f4; z-index: 4; }
+
+.truncate { display: inline-block; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 
 .group-row td { background: #eceef2; font-weight: 600; padding: 8px; }
 .group-row .toggle { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
@@ -89,6 +87,9 @@ thead .col-code, thead .col-name { background: #eef0f4; z-index: 4; }
 .teacher-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); border-radius: 16px; padding: 4px 10px 4px 4px; background: #fff; cursor: pointer; font-size: 12.5px; width: 100%; }
 .avatar { width: 20px; height: 20px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .teacher-chip.empty { color: var(--unassigned); border-color: var(--unassigned-soft); background: var(--unassigned-soft); justify-content: center; padding: 5px 10px; }
+.teacher-chip.status { justify-content: center; padding: 5px 10px; }
+.teacher-chip.status.ok { color: var(--mand); border-color: var(--mand-soft); background: var(--mand-soft); }
+.teacher-chip.status.warn { color: var(--unassigned); border-color: var(--unassigned-soft); background: var(--unassigned-soft); }
 
 .popover { position: absolute; background: #fff; border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 6px 18px rgba(20, 24, 40, 0.14); z-index: 20; width: 220px; padding: 6px; }
 .popover input { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px; font-size: 12.5px; margin-bottom: 6px; }
@@ -201,10 +202,6 @@ thead .col-code, thead .col-name { background: #eef0f4; z-index: 4; }
 .chip-removable { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); border-radius: 16px; padding: 4px 6px 4px 12px; font-size: 12.5px; text-decoration: none; }
 .chip-removable .x { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: rgba(217, 154, 43, 0.18); font-size: 13px; line-height: 1; }
 .chip-removable:hover .x { background: var(--accent); color: #fff; }
-
-/* Density toggle in the navbar. */
-.density-toggle { background: none; border: 1px solid #44518c; color: #c5cbe0; border-radius: 6px; padding: 5px 9px; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
-.density-toggle:hover { color: #fff; border-color: #c5cbe0; }
 
 /* Loading skeleton — mimics the table shape during HTMX swaps (shimmer, no spinner). */
 .htmx-indicator { display: none; }

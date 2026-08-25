@@ -11,13 +11,14 @@ from datetime import date
 from django.db.models import Count, Sum
 from django.utils import timezone
 
-from accounts.models import Department
-from plans.models import Fan, FanSemestr, FanVariant, OquvReja
+from accounts.models import Department, OqituvchiProfil
+from plans.models import Fan, FanSemestr, FanVariant, Guruh, OquvReja, Yuklama
 from plans.services import (
     TalabSatri,
     fan_semestr_talabi,
     ofis_taqsimoti,
     taqsimlangan_soatlar,
+    taqsimot_hisoboti,
 )
 
 
@@ -236,6 +237,82 @@ def reja_semestrovkasi(reja: OquvReja) -> list[SemestrovkaSatri]:
             )
         )
     return satrlar
+
+
+@dataclass(frozen=True)
+class OqituvchiYuklamasi:
+    """One teacher's slice of a course-semester, for read-only display."""
+
+    oqituvchi: OqituvchiProfil
+    tur_matni: str
+    guruh: Guruh | None
+
+
+@dataclass(frozen=True)
+class SemestrKesimSatri:
+    """One reja-by-semester row: a course as taught in one specific semester."""
+
+    fan: Fan
+    variant: FanVariant
+    fan_semestr: FanSemestr
+    tanlanmagan: bool
+    talab_satrlari: list[TalabSatri]
+    yuklamalar: list[OqituvchiYuklamasi]
+
+    @property
+    def kafedra(self) -> Department | None:
+        return self.variant.kafedra if not self.tanlanmagan else None
+
+    @property
+    def biriktirilmagan(self) -> bool:
+        return self.kafedra is None
+
+    @property
+    def taqsimlangan(self) -> bool:
+        return bool(self.talab_satrlari) and all(
+            (t.qoldiq_soat or 0) <= 0 for t in self.talab_satrlari
+        )
+
+
+def reja_semestr_kesimi(reja: OquvReja) -> dict[int, list[SemestrKesimSatri]]:
+    """Per-semester course rows for one reja, keyed by semester number."""
+    talablar: dict[int, list[TalabSatri]] = defaultdict(list)
+    for satr in taqsimot_hisoboti(reja):
+        talablar[satr.fan_semestr.pk].append(satr)
+    yuklamalar = _fan_semestr_yuklamalari(reja)
+
+    satrlar: dict[int, list[SemestrKesimSatri]] = defaultdict(list)
+    for fan_satri in reja_semestrovkasi(reja):
+        for fs in fan_satri.semestr_soatlari.values():
+            satrlar[fs.semestr].append(
+                SemestrKesimSatri(
+                    fan=fan_satri.fan,
+                    variant=fan_satri.variant,
+                    fan_semestr=fs,
+                    tanlanmagan=fan_satri.tanlanmagan,
+                    talab_satrlari=talablar.get(fs.pk, []),
+                    yuklamalar=yuklamalar.get(fs.pk, []),
+                )
+            )
+    return dict(satrlar)
+
+
+def _fan_semestr_yuklamalari(
+    reja: OquvReja,
+) -> dict[int, list[OqituvchiYuklamasi]]:
+    qatorlar = Yuklama.objects.filter(
+        fan_semestr__variant__fan__reja=reja
+    ).select_related("oqituvchi__foydalanuvchi", "guruh")
+    natija: dict[int, list[OqituvchiYuklamasi]] = defaultdict(list)
+    for yuklama in qatorlar:
+        natija[yuklama.fan_semestr_id].append(
+            OqituvchiYuklamasi(
+                oqituvchi=yuklama.oqituvchi,
+                tur_matni=yuklama.get_tur_display(),
+                guruh=yuklama.guruh,
+            )
+        )
+    return dict(natija)
 
 
 @dataclass(frozen=True)

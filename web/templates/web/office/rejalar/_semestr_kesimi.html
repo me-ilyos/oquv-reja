@@ -1,0 +1,46 @@
+{% load ui %}
+{% comment %}Reja courses grouped by semester: a horizontal tab per occupied
+semester, each listing the courses taught that term with kafedra delegation
+(editable here) and teacher delegation (read-only status + popover; teachers
+are delegated from the kafedra dashboard).{% endcomment %}
+<div x-data="{ sem: {{ birinchi_semestr|default:"null" }} }">
+<div class="controls">
+  {% for s in semestr_raqamlari %}
+  {% with satrlar=semestr_kesimi|kalit:s %}
+  {% if satrlar %}
+  <button type="button" class="chip-btn" :class="sem === {{ s }} && 'active'" @click="sem = {{ s }}">S{{ s }} <span class="group-count">({{ satrlar|length }})</span></button>
+  {% endif %}
+  {% endwith %}
+  {% endfor %}
+</div>
+{% for s in semestr_raqamlari %}
+{% with satrlar=semestr_kesimi|kalit:s %}
+{% if satrlar %}
+<div x-show="sem === {{ s }}" x-cloak class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="col-idx">№</th>
+        <th class="col-code">Kod</th>
+        <th class="col-name">Fan</th>
+        <th class="num">Kredit</th>
+        <th class="num">Ma'ruza</th>
+        <th class="num">Amaliyot</th>
+        <th class="num">Lab.</th>
+        <th class="num">Seminar</th>
+        <th class="num">Kurs ishi</th>
+        <th class="assign-cell">Kafedra</th>
+        <th class="assign-cell">O'qituvchi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for satr in satrlar %}
+      {% include "web/office/rejalar/_semestr_kesimi_qatori.html" %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endwith %}
+{% endfor %}
+</div>
