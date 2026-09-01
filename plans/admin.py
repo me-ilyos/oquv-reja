@@ -10,6 +10,7 @@ from plans.models import (
     FanVariant,
     Guruh,
     OquvReja,
+    TalimYonalishi,
     Yuklama,
 )
 from plans.services import fan_semestr_talabi, guruhlarni_sinxronlash
@@ -54,6 +55,12 @@ class OquvRejaAdmin(admin.ModelAdmin):
     ) -> None:
         super().save_model(request, obj, form, change)
         guruhlarni_sinxronlash(obj)
+
+
+@admin.register(TalimYonalishi)
+class TalimYonalishiAdmin(admin.ModelAdmin):
+    list_display = ("kodi", "nomi", "bilim_sohasi_kodi", "talim_sohasi_kodi")
+    search_fields = ("kodi", "nomi")
 
 
 class FanForm(forms.ModelForm):

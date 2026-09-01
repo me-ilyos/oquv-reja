@@ -4,15 +4,13 @@ from accounts.models import Department
 from parser.models import Alternative, Course, SelectiveSlot
 from plans.importer import ImportNatija, ImportXato, ParsedReja
 from plans.importer import import_reja as _import_reja
-from plans.models import FanSemestr, FanTuri, SoatTuri, Yuklama
-from plans.tests.factories import make_oqituvchi
+from plans.models import FanSemestr, FanTuri, SoatTuri, TalimYonalishi, Yuklama
+from plans.tests.factories import make_oqituvchi, make_yonalish
 
 
 def import_reja(parsed: ParsedReja, **kwargs: object) -> ImportNatija:
-    kwargs.setdefault("bilim_sohasi_kodi", "6")
-    kwargs.setdefault("bilim_sohasi_nomi", "Test bilim sohasi")
-    kwargs.setdefault("talim_sohasi_kodi", "606")
-    kwargs.setdefault("talim_sohasi_nomi", "Test ta'lim sohasi")
+    if not TalimYonalishi.objects.filter(kodi=parsed.yonalish_kodi).exists():
+        make_yonalish(kodi=parsed.yonalish_kodi)
     return _import_reja(parsed, **kwargs)
 
 
@@ -73,7 +71,6 @@ def make_parsed(
 ) -> ParsedReja:
     return ParsedReja(
         yonalish_kodi="60610100",
-        yonalish_nomi="Dasturiy injiniring",
         boshlanish_yili=2024,
         daraja="Bakalavr",
         davomiylik_yil=4,
@@ -165,6 +162,14 @@ class ImportRejaTest(TestCase):
         self.assertEqual(FanSemestr.objects.count(), 0)
         self.assertEqual(len(natija.ogohlantirishlar), 1)
         self.assertIn("1.01", natija.ogohlantirishlar[0])
+
+    def test_klassifikatorda_yoq_yonalish_rad_etiladi(self) -> None:
+        parsed = make_parsed()
+        self.assertFalse(
+            TalimYonalishi.objects.filter(kodi=parsed.yonalish_kodi).exists()
+        )
+        with self.assertRaises(ImportXato):
+            _import_reja(parsed)
 
     def test_qayta_import_replace_siz_rad_etiladi(self) -> None:
         import_reja(make_parsed())

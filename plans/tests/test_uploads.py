@@ -5,19 +5,20 @@ import openpyxl
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
-from plans.importer import ImportXato
+from plans.importer import ImportXato, parse_xlsx
 from plans.models import OquvReja
+from plans.tests.factories import make_yonalish
 from plans.uploads import YuklashParametrlari, fayldan_import_qilish
 
-BHA = Path(__file__).resolve().parents[2] / "sources" / "BHA.xlsx"
+BHA = (
+    Path(__file__).resolve().parents[2]
+    / "sources"
+    / "(24-25) Buxgalteriya hisobi eng, it 21.08.2024.xlsx"
+)
 
 
 def _parametrlar(**kwargs: object) -> YuklashParametrlari:
     maydonlar: dict[str, object] = {
-        "bilim_sohasi_kodi": "6",
-        "bilim_sohasi_nomi": "Test bilim sohasi",
-        "talim_sohasi_kodi": "606",
-        "talim_sohasi_nomi": "Test ta'lim sohasi",
         "talabalar_soni": 50,
         "guruhlar_soni": 2,
         "guruh_prefiksi": "BH",
@@ -30,6 +31,8 @@ def _parametrlar(**kwargs: object) -> YuklashParametrlari:
 
 class FayldanImportTests(TestCase):
     def test_haqiqiy_fayl_import_qilinadi(self) -> None:
+        yonalish_kodi = parse_xlsx(BHA, boshlanish_yili=2025).yonalish_kodi
+        make_yonalish(kodi=yonalish_kodi)
         fayl = SimpleUploadedFile("BHA.xlsx", BHA.read_bytes())
 
         natija = fayldan_import_qilish(fayl, _parametrlar())

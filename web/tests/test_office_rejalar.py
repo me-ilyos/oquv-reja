@@ -32,10 +32,6 @@ class RejaImportTests(TestCase):
             reverse("office:reja_yangi"),
             {
                 "fayl": SimpleUploadedFile("reja.xlsx", b"bu excel emas"),
-                "bilim_sohasi_kodi": "6",
-                "bilim_sohasi_nomi": "Test bilim sohasi",
-                "talim_sohasi_kodi": "606",
-                "talim_sohasi_nomi": "Test ta'lim sohasi",
                 "talabalar_soni": 50,
                 "guruhlar_soni": 2,
                 "guruh_prefiksi": "BH",

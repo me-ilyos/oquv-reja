@@ -10,6 +10,7 @@ from plans.models import (
     FanVariant,
     Guruh,
     OquvReja,
+    TalimYonalishi,
 )
 
 _telefon_raqami = count(1)
@@ -31,6 +32,19 @@ def make_reja(**kwargs: object) -> OquvReja:
     }
     maydonlar.update(kwargs)
     return OquvReja.objects.create(**maydonlar)
+
+
+def make_yonalish(**kwargs: object) -> TalimYonalishi:
+    maydonlar: dict[str, object] = {
+        "kodi": "60610100",
+        "nomi": "Dasturiy injiniring",
+        "bilim_sohasi_kodi": "6",
+        "bilim_sohasi_nomi": "Test bilim sohasi",
+        "talim_sohasi_kodi": "606",
+        "talim_sohasi_nomi": "Test ta'lim sohasi",
+    }
+    maydonlar.update(kwargs)
+    return TalimYonalishi.objects.create(**maydonlar)
 
 
 def make_fan(

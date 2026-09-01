@@ -17,19 +17,11 @@ YUKLASH_KATALOGI = "rejalar"
 
 @dataclass(frozen=True)
 class YuklashParametrlari:
-    bilim_sohasi_kodi: str
-    bilim_sohasi_nomi: str
-    talim_sohasi_kodi: str
-    talim_sohasi_nomi: str
     talabalar_soni: int
     guruhlar_soni: int
     guruh_prefiksi: str
     boshlanish_yili: int | None
     replace: bool
-    yonalish_kodi: str = ""
-    yonalish_nomi: str = ""
-    talim_shakli: str = ""
-    daraja: str = ""
 
 
 def fayldan_import_qilish(
@@ -42,25 +34,11 @@ def fayldan_import_qilish(
     """
     yol = _faylni_saqlash(fayl)
     try:
-        parsed = parse_xlsx(
-            yol,
-            parametrlar.boshlanish_yili,
-            yonalish_kodi=parametrlar.yonalish_kodi or None,
-            yonalish_nomi=parametrlar.yonalish_nomi or None,
-            talim_shakli=parametrlar.talim_shakli or None,
-            daraja=parametrlar.daraja or None,
-        )
+        parsed = parse_xlsx(yol, parametrlar.boshlanish_yili)
     except BadZipFile as xato:
         raise ImportXato("fayl .xlsx formatida emas yoki buzilgan") from xato
     with transaction.atomic():
-        natija = import_reja(
-            parsed,
-            bilim_sohasi_kodi=parametrlar.bilim_sohasi_kodi,
-            bilim_sohasi_nomi=parametrlar.bilim_sohasi_nomi,
-            talim_sohasi_kodi=parametrlar.talim_sohasi_kodi,
-            talim_sohasi_nomi=parametrlar.talim_sohasi_nomi,
-            replace=parametrlar.replace,
-        )
+        natija = import_reja(parsed, replace=parametrlar.replace)
         reja = natija.reja
         reja.talabalar_soni = parametrlar.talabalar_soni
         reja.guruhlar_soni = parametrlar.guruhlar_soni

@@ -15,6 +15,7 @@ from plans.models import (
     FanTuri,
     FanVariant,
     OquvReja,
+    TalimYonalishi,
     Yuklama,
 )
 from plans.split import split_breakdown
@@ -27,7 +28,6 @@ class ImportXato(Exception):
 @dataclass(frozen=True)
 class ParsedReja:
     yonalish_kodi: str
-    yonalish_nomi: str
     boshlanish_yili: int
     daraja: str
     davomiylik_yil: int
@@ -47,21 +47,13 @@ class ImportNatija:
     ogohlantirishlar: list[str]
 
 
-def parse_xlsx(
-    path: Path,
-    boshlanish_yili: int | None = None,
-    *,
-    yonalish_kodi: str | None = None,
-    yonalish_nomi: str | None = None,
-    talim_shakli: str | None = None,
-    daraja: str | None = None,
-) -> ParsedReja:
+def parse_xlsx(path: Path, boshlanish_yili: int | None = None) -> ParsedReja:
     try:
         natija = parse_workbook(path)
     except ParseError as exc:
         raise ImportXato(str(exc)) from exc
 
-    if yonalish_kodi is None and not natija.direction_code:
+    if not natija.direction_code:
         raise ImportXato("yo'nalish kodi topilmadi — reja identifikatsiya qilinmaydi")
     if boshlanish_yili is None:
         if not natija.start_year:
@@ -79,12 +71,11 @@ def parse_xlsx(
         )
 
     return ParsedReja(
-        yonalish_kodi=yonalish_kodi or natija.direction_code,
-        yonalish_nomi=yonalish_nomi or _bir_qatorga(natija.direction_name, 255),
+        yonalish_kodi=natija.direction_code,
         boshlanish_yili=boshlanish_yili,
-        daraja=daraja or _bir_qatorga(natija.degree, 100),
+        daraja=_bir_qatorga(natija.degree, 100),
         davomiylik_yil=davomiylik_yil,
-        talim_shakli=talim_shakli or _bir_qatorga(natija.edu_type, 100),
+        talim_shakli=_bir_qatorga(natija.edu_type, 100),
         fayl_nomi=path.name,
         core=natija.core,
         slots=natija.slots,
@@ -99,23 +90,15 @@ def _bir_qatorga(matn: str, uzunlik: int) -> str:
 
 
 @transaction.atomic
-def import_reja(
-    parsed: ParsedReja,
-    *,
-    bilim_sohasi_kodi: str,
-    bilim_sohasi_nomi: str,
-    talim_sohasi_kodi: str,
-    talim_sohasi_nomi: str,
-    replace: bool = False,
-) -> ImportNatija:
-    reja, yaratildi, holat = _rejani_tayyorlash(
-        parsed,
-        bilim_sohasi_kodi,
-        bilim_sohasi_nomi,
-        talim_sohasi_kodi,
-        talim_sohasi_nomi,
-        replace,
-    )
+def import_reja(parsed: ParsedReja, *, replace: bool = False) -> ImportNatija:
+    try:
+        yonalish = TalimYonalishi.objects.get(kodi=parsed.yonalish_kodi)
+    except TalimYonalishi.DoesNotExist as exc:
+        raise ImportXato(
+            f"{parsed.yonalish_kodi} yo'nalishi klassifikatorda topilmadi — "
+            "avval admin panelda bilim/ta'lim sohasini qo'shing"
+        ) from exc
+    reja, yaratildi, holat = _rejani_tayyorlash(parsed, yonalish, replace)
     ogohlantirishlar: list[str] = list(parsed.ogohlantirishlar)
     for course in parsed.core:
         ogohlantirishlar += _majburiy_fan_yaratish(reja, course)
@@ -134,19 +117,16 @@ def import_reja(
 
 def _rejani_tayyorlash(
     parsed: ParsedReja,
-    bilim_sohasi_kodi: str,
-    bilim_sohasi_nomi: str,
-    talim_sohasi_kodi: str,
-    talim_sohasi_nomi: str,
+    yonalish: TalimYonalishi,
     replace: bool,
 ) -> tuple[OquvReja, bool, dict | None]:
     """Create the reja or, on re-import, empty it while keeping manual state."""
     yangilanadigan = {
-        "bilim_sohasi_kodi": bilim_sohasi_kodi,
-        "bilim_sohasi_nomi": bilim_sohasi_nomi,
-        "talim_sohasi_kodi": talim_sohasi_kodi,
-        "talim_sohasi_nomi": talim_sohasi_nomi,
-        "yonalish_nomi": parsed.yonalish_nomi,
+        "bilim_sohasi_kodi": yonalish.bilim_sohasi_kodi,
+        "bilim_sohasi_nomi": yonalish.bilim_sohasi_nomi,
+        "talim_sohasi_kodi": yonalish.talim_sohasi_kodi,
+        "talim_sohasi_nomi": yonalish.talim_sohasi_nomi,
+        "yonalish_nomi": yonalish.nomi,
         "daraja": parsed.daraja,
         "davomiylik_yil": parsed.davomiylik_yil,
         "manba_fayl": parsed.fayl_nomi,

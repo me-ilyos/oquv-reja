@@ -11,41 +11,6 @@ class RejaImportForm(forms.Form):
         label="Excel fayl (.xlsx)",
         widget=forms.ClearableFileInput(attrs={"accept": ".xlsx"}),
     )
-    bilim_sohasi_kodi = forms.CharField(label="Bilim sohasi kodi", max_length=10)
-    bilim_sohasi_nomi = forms.CharField(label="Bilim sohasi nomi", max_length=255)
-    talim_sohasi_kodi = forms.CharField(label="Ta'lim sohasi kodi", max_length=10)
-    talim_sohasi_nomi = forms.CharField(label="Ta'lim sohasi nomi", max_length=255)
-    boshlanish_yili = forms.IntegerField(
-        label="Boshlanish yili",
-        required=False,
-        min_value=2000,
-        max_value=2100,
-        help_text="Bo'sh qoldirilsa fayldan o'qiladi",
-    )
-    yonalish_kodi = forms.CharField(
-        label="Yo'nalish kodi",
-        required=False,
-        max_length=20,
-        help_text="Bo'sh qoldirilsa fayldan o'qiladi",
-    )
-    yonalish_nomi = forms.CharField(
-        label="Yo'nalish nomi",
-        required=False,
-        max_length=255,
-        help_text="Bo'sh qoldirilsa fayldan o'qiladi",
-    )
-    talim_shakli = forms.CharField(
-        label="Ta'lim shakli",
-        required=False,
-        max_length=100,
-        help_text="Bo'sh qoldirilsa fayldan o'qiladi",
-    )
-    daraja = forms.CharField(
-        label="Akademik daraja",
-        required=False,
-        max_length=100,
-        help_text="Bo'sh qoldirilsa fayldan o'qiladi",
-    )
     talabalar_soni = forms.IntegerField(label="Talabalar soni", min_value=1)
     guruhlar_soni = forms.IntegerField(label="Guruhlar soni", min_value=1)
     guruh_prefiksi = forms.CharField(
@@ -58,19 +23,11 @@ class RejaImportForm(forms.Form):
 
     def parametrlar(self) -> YuklashParametrlari:
         return YuklashParametrlari(
-            bilim_sohasi_kodi=self.cleaned_data["bilim_sohasi_kodi"],
-            bilim_sohasi_nomi=self.cleaned_data["bilim_sohasi_nomi"],
-            talim_sohasi_kodi=self.cleaned_data["talim_sohasi_kodi"],
-            talim_sohasi_nomi=self.cleaned_data["talim_sohasi_nomi"],
             talabalar_soni=self.cleaned_data["talabalar_soni"],
             guruhlar_soni=self.cleaned_data["guruhlar_soni"],
             guruh_prefiksi=self.cleaned_data["guruh_prefiksi"],
-            boshlanish_yili=self.cleaned_data["boshlanish_yili"],
+            boshlanish_yili=None,
             replace=self.cleaned_data["replace"],
-            yonalish_kodi=self.cleaned_data["yonalish_kodi"],
-            yonalish_nomi=self.cleaned_data["yonalish_nomi"],
-            talim_shakli=self.cleaned_data["talim_shakli"],
-            daraja=self.cleaned_data["daraja"],
         )
 
 

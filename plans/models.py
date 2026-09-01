@@ -33,6 +33,30 @@ class SoatTuri(models.TextChoices):
 PER_GURUH_TURLAR = (SoatTuri.AMALIYOT, SoatTuri.LABORATORIYA, SoatTuri.SEMINAR)
 
 
+class TalimYonalishi(models.Model):
+    """Official classifier row: major code -> field of study / knowledge.
+
+    Maintained by AOH via admin, one row per major, independent of any
+    single reja upload. `OquvReja.bilim_sohasi_*`/`talim_sohasi_*`/
+    `yonalish_nomi` are populated from here at import time.
+    """
+
+    kodi = models.CharField(max_length=20, unique=True)
+    nomi = models.CharField(max_length=255)
+    bilim_sohasi_kodi = models.CharField(max_length=10)
+    bilim_sohasi_nomi = models.CharField(max_length=255)
+    talim_sohasi_kodi = models.CharField(max_length=10)
+    talim_sohasi_nomi = models.CharField(max_length=255)
+
+    class Meta:
+        verbose_name = "Ta'lim yo'nalishi (klassifikator)"
+        verbose_name_plural = "Ta'lim yo'nalishlari (klassifikator)"
+        ordering = ["kodi"]
+
+    def __str__(self) -> str:
+        return f"{self.kodi} {self.nomi}"
+
+
 class OquvReja(models.Model):
     """One major intake: a curriculum (direction + start year + study form)."""
 
