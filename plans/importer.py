@@ -1,23 +1,14 @@
 """Persist a parsed o'quv reja into the plans schema."""
 
-import re
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 from pathlib import Path
 
-import openpyxl
 from django.db import transaction
 from django.utils import timezone
 
-from parser.models import Alternative, Course, SelectiveSlot
-from parser.parser import (
-    detect_sheet_layout,
-    extract_start_year,
-    find_cell_containing,
-    parse_core_courses,
-    parse_selective_courses,
-    read_metadata,
-    resolve_direction,
-)
+from parser.models import Alternative, Course, ParseError, SelectiveSlot
+from parser.parser import parse_workbook
 from plans.models import (
     Fan,
     FanSemestr,
@@ -44,6 +35,7 @@ class ParsedReja:
     fayl_nomi: str
     core: list[Course]
     slots: list[SelectiveSlot]
+    ogohlantirishlar: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -64,40 +56,40 @@ def parse_xlsx(
     talim_shakli: str | None = None,
     daraja: str | None = None,
 ) -> ParsedReja:
-    ws = openpyxl.load_workbook(path, data_only=True).active
-    direction = resolve_direction(ws)
-    if direction is None or not direction[0]:
+    try:
+        natija = parse_workbook(path)
+    except ParseError as exc:
+        raise ImportXato(str(exc)) from exc
+
+    if yonalish_kodi is None and not natija.direction_code:
         raise ImportXato("yo'nalish kodi topilmadi — reja identifikatsiya qilinmaydi")
     if boshlanish_yili is None:
-        boshlanish_yili = _varaqdagi_boshlanish_yili(ws)
-    varaqdagi_daraja, davomiylik_matni, varaqdagi_shakl = read_metadata(ws)
-    layout, semester_map, weekly_map = detect_sheet_layout(ws)
-    return ParsedReja(
-        yonalish_kodi=yonalish_kodi or direction[0],
-        yonalish_nomi=yonalish_nomi or _bir_qatorga(direction[1], 255),
-        boshlanish_yili=boshlanish_yili,
-        daraja=daraja or _bir_qatorga(varaqdagi_daraja, 100),
-        davomiylik_yil=_davomiylik_yillari(davomiylik_matni),
-        talim_shakli=talim_shakli or _bir_qatorga(varaqdagi_shakl, 100),
-        fayl_nomi=path.name,
-        core=parse_core_courses(ws, layout, semester_map, weekly_map),
-        slots=parse_selective_courses(ws, layout, semester_map, weekly_map),
-    )
+        if not natija.start_year:
+            raise ImportXato(
+                "o'quv yili topilmadi — boshlanish yilini --yil bilan ko'rsating"
+            )
+        boshlanish_yili = int(natija.start_year)
 
-
-def _varaqdagi_boshlanish_yili(ws: object) -> int:
-    yil_katak = find_cell_containing(ws, "quv yili")
-    boshlanish = extract_start_year(str(yil_katak.value)) if yil_katak else ""
-    if not boshlanish:
-        raise ImportXato(
-            "o'quv yili topilmadi — boshlanish yilini --yil bilan ko'rsating"
+    ogohlantirishlar = list(natija.warnings)
+    davomiylik_yil = math.ceil(natija.duration_years)
+    if davomiylik_yil != natija.duration_years:
+        ogohlantirishlar.append(
+            f"o'qish muddati {natija.duration_years:g} yil —"
+            f" {davomiylik_yil} yilga yaxlitlandi"
         )
-    return int(boshlanish)
 
-
-def _davomiylik_yillari(matn: str) -> int:
-    match = re.search(r"(\d+)\s*yil", matn)
-    return int(match.group(1)) if match else 4
+    return ParsedReja(
+        yonalish_kodi=yonalish_kodi or natija.direction_code,
+        yonalish_nomi=yonalish_nomi or _bir_qatorga(natija.direction_name, 255),
+        boshlanish_yili=boshlanish_yili,
+        daraja=daraja or _bir_qatorga(natija.degree, 100),
+        davomiylik_yil=davomiylik_yil,
+        talim_shakli=talim_shakli or _bir_qatorga(natija.edu_type, 100),
+        fayl_nomi=path.name,
+        core=natija.core,
+        slots=natija.slots,
+        ogohlantirishlar=ogohlantirishlar,
+    )
 
 
 def _bir_qatorga(matn: str, uzunlik: int) -> str:
@@ -124,7 +116,7 @@ def import_reja(
         talim_sohasi_nomi,
         replace,
     )
-    ogohlantirishlar: list[str] = []
+    ogohlantirishlar: list[str] = list(parsed.ogohlantirishlar)
     for course in parsed.core:
         ogohlantirishlar += _majburiy_fan_yaratish(reja, course)
     for slot in parsed.slots:

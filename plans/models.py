@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models import Q, Sum
 
 from accounts.models import Department, OqituvchiProfil
+from parser.models import derived_credits
 from plans.managers import (
     FanManager,
     FanSemestrManager,
@@ -129,8 +130,7 @@ class Fan(models.Model):
 
     @property
     def kredit(self) -> int | None:
-        # 1 credit = 30 hours (classroom + self-study), per ministry format.
-        return self.jami_soat // 30 if self.jami_soat else None
+        return derived_credits(self.jami_soat)
 
     def clean(self) -> None:
         if self.tanlangan_variant and self.tanlangan_variant.fan_id != self.pk:

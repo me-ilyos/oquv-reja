@@ -28,13 +28,18 @@ class LargestRemainderSplitTest(SimpleTestCase):
 
 class SemesterWeightsTest(SimpleTestCase):
     def test_haftalik_soat_ustun(self) -> None:
-        self.assertEqual(semester_weights({1: 4}, {1: 2, 2: 4}), {1: 4})
+        self.assertEqual(semester_weights({1: 4}, {1: 2}), {1: 4})
 
     def test_kreditga_qaytadi(self) -> None:
         self.assertEqual(semester_weights({}, {1: 2, 2: 4}), {1: 2, 2: 4})
 
     def test_ikkalasi_bosh(self) -> None:
         self.assertEqual(semester_weights({}, {}), {})
+
+    def test_faqat_kreditdagi_semestr_qoshiladi(self) -> None:
+        # A semester present only in credits (weekly omits it) still gets a
+        # weight — it must not silently lose its FanSemestr row.
+        self.assertEqual(semester_weights({1: 4}, {1: 2, 2: 4}), {1: 4, 2: 4})
 
 
 class SplitBreakdownTest(SimpleTestCase):

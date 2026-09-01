@@ -170,6 +170,19 @@ Each section has N sub-columns numbered 1 through N, where N = total semesters:
 
 **How to find semester columns:** locate the row that contains semester numbers (1, 2, 3, ..., N). These numbers appear in the header rows, directly below the `kurs` labels. Count how many consecutive semester numbers you find — this gives you both the column positions and the semester count.
 
+> Amendment (verified against `sources/`): the N sub-columns are not always
+> adjacent. Maktabgacha ta'lim (60110200, 3-year) groups them under a
+> `1-kurs`/`2-kurs`/`3-kurs` row and spaces them 3 apart even within one
+> group (e.g. weekly columns at 48, 51, 54, 57, 60, 63) — the same spacing
+> variance §4.3 documents for the hour-type columns applies here too. Bound
+> the search window by the *other* group's header column when one is known,
+> not by a fixed `N`-sized guess.
+>
+> The same file also has a header cell typed as `Кreditlarning …` with a
+> Cyrillic `К` (U+041A) instead of Latin `K` — invisible on screen, fatal to
+> a plain substring search. Normalize common Cyrillic look-alikes to Latin
+> before matching header labels.
+
 The last column after all semester credits is **Jami kreditlar** (total credits).
 
 ### 4.4. Column-Number Row
