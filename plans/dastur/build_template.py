@@ -8,6 +8,7 @@ from pathlib import Path
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Mm, Pt
 from docxtpl import DocxTemplate
@@ -201,6 +202,36 @@ def _build_footer_table(document: Document) -> None:
     _apply_reference_hyperlinks(table)
 
 
+def _add_page_number_field(paragraph) -> None:
+    run = paragraph.add_run()
+    run.font.size = Pt(12)
+    fld_begin = OxmlElement("w:fldChar")
+    fld_begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = "PAGE"
+    fld_separate = OxmlElement("w:fldChar")
+    fld_separate.set(qn("w:fldCharType"), "separate")
+    fld_end = OxmlElement("w:fldChar")
+    fld_end.set(qn("w:fldCharType"), "end")
+    run._r.append(fld_begin)
+    run._r.append(instr)
+    run._r.append(fld_separate)
+    run._r.append(fld_end)
+
+
+def _build_footer(document: Document) -> None:
+    footer = document.sections[0].footer
+    paragraph = footer.paragraphs[0]
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _add_page_number_field(paragraph)
+
+
+def _add_trailing_paragraphs(document: Document) -> None:
+    for _ in range(4):
+        document.add_paragraph()
+
+
 def _check_template_variables(path: Path) -> None:
     template = DocxTemplate(path)
     found = template.get_undeclared_template_variables()
@@ -219,6 +250,8 @@ def build() -> Document:
     _build_cover_page(document)
     build_table_from_spec(document, table1_rows(), TABLE1_COL_WIDTHS)
     _build_footer_table(document)
+    _add_trailing_paragraphs(document)
+    _build_footer(document)
     return document
 
 
