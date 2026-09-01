@@ -1,4 +1,6 @@
 from django.test import TestCase
+from docx.oxml.ns import qn
+from docx.shared import Mm
 
 from accounts.models import Department, Universitet
 from plans import dashboard
@@ -173,3 +175,39 @@ class DasturKontekstTest(TestCase):
         )
         self.assertIn("M1", matn)
         self.assertIn(f"M{self.variant.maruza_soat // 2}", matn)
+
+
+class DasturFormatlashTest(TestCase):
+    """Uses the raw template (plans.dastur.service.SABLON_YOLI), not a
+    rendered document — docxtpl's {%tr %} loops add/remove rows based on
+    context, so row counts are only stable before rendering."""
+
+    def setUp(self) -> None:
+        from docx import Document
+
+        from plans.dastur.service import SABLON_YOLI
+
+        self.hujjat = Document(SABLON_YOLI)
+
+    def test_sahifa_olchami_a4(self) -> None:
+        bolim = self.hujjat.sections[0]
+        self.assertEqual(bolim.page_width.twips, Mm(210).twips)
+        self.assertEqual(bolim.page_height.twips, Mm(297).twips)
+
+    def test_shrift_times_new_roman(self) -> None:
+        normal = self.hujjat.styles["Normal"]
+        self.assertEqual(normal.font.name, "Times New Roman")
+        rfonts = normal.font.element.get_or_add_rPr().find(qn("w:rFonts"))
+        self.assertEqual(rfonts.get(qn("w:eastAsia")), "Times New Roman")
+        self.assertEqual(rfonts.get(qn("w:cs")), "Times New Roman")
+
+    def test_sarlavha_qatori_kulrang_fon(self) -> None:
+        header_row = self.hujjat.tables[1].rows[0]
+        tc = header_row.cells[0]._tc
+        shd = tc.find(qn("w:tcPr")).find(qn("w:shd"))
+        self.assertEqual(shd.get(qn("w:fill")), "D9D9D9")
+
+    def test_jadval_tuzilishi_saqlanadi(self) -> None:
+        self.assertEqual(len(self.hujjat.tables), 3)
+        self.assertEqual(len(self.hujjat.tables[1].rows), 58)
+        self.assertEqual(len(self.hujjat.tables[2].rows), 17)
