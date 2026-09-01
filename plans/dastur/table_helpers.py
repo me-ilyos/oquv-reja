@@ -28,6 +28,13 @@ _ALIGNMENTS = {
 
 
 @dataclass(frozen=True)
+class RunSpec:
+    text: str
+    bold: bool = False
+    italic: bool = False
+
+
+@dataclass(frozen=True)
 class CellSpec:
     text: str = ""
     bold: bool = False
@@ -40,6 +47,10 @@ class CellSpec:
     """A Jinja `{{ }}`/`{%tr %}` tag to write as a single unsplit run,
     instead of `text` — never concatenated from multiple runs, since that
     would break docxtpl's tag parser."""
+    runs: tuple[RunSpec, ...] | None = None
+    """A label (bold) followed by a Jinja tag (plain) in the same cell —
+    e.g. metadata cells like "Fan/modul kodi{{ course.code }}". Each
+    RunSpec.text is written as its own run so the tag stays whole."""
 
 
 @dataclass(frozen=True)
@@ -72,6 +83,14 @@ def _add_tag_run(paragraph: Paragraph, tag: str, *, align: Align = "left") -> No
     string must always be passed whole to a single add_run() call."""
     paragraph.alignment = _ALIGNMENTS[align]
     paragraph.add_run(tag)
+
+
+def _add_runs(paragraph: Paragraph, run_specs: tuple[RunSpec, ...], *, align: Align) -> None:
+    paragraph.alignment = _ALIGNMENTS[align]
+    for run_spec in run_specs:
+        run = paragraph.add_run(run_spec.text)
+        run.bold = run_spec.bold
+        run.italic = run_spec.italic
 
 
 def _merge_row_cells(table: Table, row_idx: int, spans: list[int]) -> list[_Cell]:
@@ -152,16 +171,21 @@ def build_table_from_spec(
                 _shade_cell(cell)
             if cell_spec.vmerge == "continue":
                 continue
-            if cell_spec.jinja_run is not None:
-                _add_tag_run(
-                    cell.paragraphs[0], cell_spec.jinja_run, align=cell_spec.align
-                )
-            else:
-                _set_cell_text(
-                    cell,
-                    cell_spec.text,
-                    bold=cell_spec.bold,
-                    italic=cell_spec.italic,
-                    align=cell_spec.align,
-                )
+            _write_cell_content(cell, cell_spec)
     return table
+
+
+def _write_cell_content(cell: _Cell, cell_spec: CellSpec) -> None:
+    paragraph = cell.paragraphs[0]
+    if cell_spec.runs is not None:
+        _add_runs(paragraph, cell_spec.runs, align=cell_spec.align)
+    elif cell_spec.jinja_run is not None:
+        _add_tag_run(paragraph, cell_spec.jinja_run, align=cell_spec.align)
+    else:
+        _set_cell_text(
+            cell,
+            cell_spec.text,
+            bold=cell_spec.bold,
+            italic=cell_spec.italic,
+            align=cell_spec.align,
+        )

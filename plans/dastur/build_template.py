@@ -12,6 +12,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Mm, Pt
 from docxtpl import DocxTemplate
 
+from plans.dastur.table1_spec import TABLE1_COL_WIDTHS, table1_rows
 from plans.dastur.table_helpers import CellSpec, RowSpec, build_table_from_spec
 from plans.dastur.template_text import TASDIQLAYMAN_BOX
 
@@ -190,6 +191,7 @@ def build() -> Document:
     _set_page_setup(document)
     _register_styles(document)
     _build_cover_page(document)
+    build_table_from_spec(document, table1_rows(), TABLE1_COL_WIDTHS)
     return document
 
 
