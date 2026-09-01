@@ -12,7 +12,12 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Mm, Pt
 from docxtpl import DocxTemplate
 
+from plans.dastur.table_helpers import CellSpec, RowSpec, build_table_from_spec
+from plans.dastur.template_text import TASDIQLAYMAN_BOX
+
 OUTPUT_PATH = Path(__file__).resolve().parent / "oquv_dastur.docx"
+
+TABLE0_COL_WIDTHS = [5495, 4081]
 
 EXPECTED_TOP_LEVEL_VARS = {
     "university",
@@ -83,6 +88,92 @@ def _register_styles(document: Document) -> None:
     justify.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
 
+def _add_run_paragraph(
+    document: Document, runs: list[tuple[str, bool]], *, align, style=None
+):
+    """Adds a paragraph made of (text, bold) run pairs — used for cover-page
+    lines that mix a bold label with a plain Jinja tag in one paragraph."""
+    paragraph = document.add_paragraph(style=style)
+    paragraph.alignment = align
+    for text, bold in runs:
+        run = paragraph.add_run(text)
+        run.bold = bold
+    return paragraph
+
+
+def _add_bold_line(document: Document, text: str) -> None:
+    paragraph = document.add_paragraph()
+    run = paragraph.add_run(text)
+    run.bold = True
+
+
+def _build_approval_table(document: Document) -> None:
+    rows = [RowSpec([CellSpec(""), CellSpec(TASDIQLAYMAN_BOX, align="left")])]
+    build_table_from_spec(document, rows, TABLE0_COL_WIDTHS)
+
+
+def _build_cover_page_title(document: Document) -> None:
+    document.add_paragraph("TURAN INTERNATIONAL UNIVERSITY", style="DasturHeading")
+    document.add_paragraph()
+    _build_approval_table(document)
+    document.add_paragraph()
+    document.add_paragraph()
+
+    _add_run_paragraph(
+        document,
+        [("{{ course.name|upper }}", True)],
+        align=WD_ALIGN_PARAGRAPH.CENTER,
+    )
+    document.add_paragraph("FANINING O‘QUV DASTURI", style="DasturHeading")
+    _add_run_paragraph(
+        document,
+        [("({{ education_form }} ta'lim uchun)", True)],
+        align=WD_ALIGN_PARAGRAPH.CENTER,
+        style="DasturItalic",
+    )
+    document.add_paragraph(style="DasturCentered")
+
+
+def _build_cover_page_major_and_signoff(document: Document) -> None:
+    _add_run_paragraph(
+        document,
+        [("Bilim sohasi:", True), ("  {{ major.bilim_sohasi }}", False)],
+        align=WD_ALIGN_PARAGRAPH.JUSTIFY,
+    )
+    _add_run_paragraph(
+        document,
+        [("Ta’lim sohasi:", True), ("  {{ major.talim_sohasi }}", False)],
+        align=WD_ALIGN_PARAGRAPH.JUSTIFY,
+    )
+    _add_run_paragraph(
+        document,
+        [("Ta’lim yo‘nalishi:", True), ("  {{ major.talim_yonalishi }}", False)],
+        align=WD_ALIGN_PARAGRAPH.JUSTIFY,
+    )
+    for _ in range(5):
+        document.add_paragraph(style="DasturCentered")
+
+    _add_run_paragraph(
+        document, [("Namangan – {{ year }}", True)], align=WD_ALIGN_PARAGRAPH.CENTER
+    )
+    document.add_paragraph(
+        "Mazkur o‘quv dasturi {{ university }} {{ kafedra }} kafedrasi tomonidan "
+        "taqdim etilgan (kafedraning {{ kafedra_council.year }}-yil"
+        "{{ kafedra_council.date }}-sonli yig‘ilish bayoni).",
+        style="DasturJustify",
+    )
+    _add_bold_line(document, "Tuzuvchi:")
+    document.add_paragraph()
+    _add_bold_line(document, "Taqrizchilar:")
+    document.add_paragraph()
+    document.add_paragraph()
+
+
+def _build_cover_page(document: Document) -> None:
+    _build_cover_page_title(document)
+    _build_cover_page_major_and_signoff(document)
+
+
 def _check_template_variables(path: Path) -> None:
     template = DocxTemplate(path)
     found = template.get_undeclared_template_variables()
@@ -98,6 +189,7 @@ def build() -> Document:
     document = Document()
     _set_page_setup(document)
     _register_styles(document)
+    _build_cover_page(document)
     return document
 
 
