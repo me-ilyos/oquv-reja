@@ -13,8 +13,18 @@ from docx.shared import Cm, Mm, Pt
 from docxtpl import DocxTemplate
 
 from plans.dastur.table1_spec import TABLE1_COL_WIDTHS, table1_rows
-from plans.dastur.table_helpers import CellSpec, RowSpec, build_table_from_spec
-from plans.dastur.template_text import TASDIQLAYMAN_BOX
+from plans.dastur.table2_spec import TABLE2_COL_WIDTHS, table2_rows
+from plans.dastur.table_helpers import (
+    CellSpec,
+    RowSpec,
+    _add_hyperlink,
+    build_table_from_spec,
+)
+from plans.dastur.template_text import (
+    AXBOROT_MANBALARI,
+    IZOH,
+    TASDIQLAYMAN_BOX,
+)
 
 OUTPUT_PATH = Path(__file__).resolve().parent / "oquv_dastur.docx"
 
@@ -175,6 +185,22 @@ def _build_cover_page(document: Document) -> None:
     _build_cover_page_major_and_signoff(document)
 
 
+def _apply_reference_hyperlinks(table) -> None:
+    """Axborot manbalari rows 14-16 hold www.lex.uz (plain text) then the
+    two real hyperlinks; row indices are fixed by table2_rows()'s layout."""
+    hyperlinked = [(text, url) for _, text, url in AXBOROT_MANBALARI if url]
+    start_row = len(table.rows) - len(hyperlinked)
+    for offset, (text, url) in enumerate(hyperlinked):
+        paragraph = table.rows[start_row + offset].cells[1].paragraphs[0]
+        _add_hyperlink(paragraph, text, url)
+
+
+def _build_footer_table(document: Document) -> None:
+    document.add_paragraph(IZOH, style="DasturJustify")
+    table = build_table_from_spec(document, table2_rows(), TABLE2_COL_WIDTHS)
+    _apply_reference_hyperlinks(table)
+
+
 def _check_template_variables(path: Path) -> None:
     template = DocxTemplate(path)
     found = template.get_undeclared_template_variables()
@@ -192,6 +218,7 @@ def build() -> Document:
     _register_styles(document)
     _build_cover_page(document)
     build_table_from_spec(document, table1_rows(), TABLE1_COL_WIDTHS)
+    _build_footer_table(document)
     return document
 
 

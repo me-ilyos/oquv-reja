@@ -35,6 +35,13 @@ class RunSpec:
 
 
 @dataclass(frozen=True)
+class ParagraphSpec:
+    text: str = ""
+    bold: bool = False
+    align: Align = "justify"
+
+
+@dataclass(frozen=True)
 class CellSpec:
     text: str = ""
     bold: bool = False
@@ -51,6 +58,9 @@ class CellSpec:
     """A label (bold) followed by a Jinja tag (plain) in the same cell —
     e.g. metadata cells like "Fan/modul kodi{{ course.code }}". Each
     RunSpec.text is written as its own run so the tag stays whole."""
+    paragraphs: tuple[ParagraphSpec, ...] | None = None
+    """Multiple paragraphs with independent bold/alignment, e.g. the
+    grading-policy prose's bold section headers mixed with body text."""
 
 
 @dataclass(frozen=True)
@@ -85,7 +95,9 @@ def _add_tag_run(paragraph: Paragraph, tag: str, *, align: Align = "left") -> No
     paragraph.add_run(tag)
 
 
-def _add_runs(paragraph: Paragraph, run_specs: tuple[RunSpec, ...], *, align: Align) -> None:
+def _add_runs(
+    paragraph: Paragraph, run_specs: tuple[RunSpec, ...], *, align: Align
+) -> None:
     paragraph.alignment = _ALIGNMENTS[align]
     for run_spec in run_specs:
         run = paragraph.add_run(run_spec.text)
@@ -176,6 +188,9 @@ def build_table_from_spec(
 
 
 def _write_cell_content(cell: _Cell, cell_spec: CellSpec) -> None:
+    if cell_spec.paragraphs is not None:
+        _write_cell_paragraphs(cell, cell_spec.paragraphs)
+        return
     paragraph = cell.paragraphs[0]
     if cell_spec.runs is not None:
         _add_runs(paragraph, cell_spec.runs, align=cell_spec.align)
@@ -189,3 +204,16 @@ def _write_cell_content(cell: _Cell, cell_spec: CellSpec) -> None:
             italic=cell_spec.italic,
             align=cell_spec.align,
         )
+
+
+def _write_cell_paragraphs(
+    cell: _Cell, paragraph_specs: tuple[ParagraphSpec, ...]
+) -> None:
+    first, *rest = paragraph_specs
+    _set_cell_text(cell, first.text, bold=first.bold, italic=False, align=first.align)
+    for spec in rest:
+        paragraph = cell.add_paragraph()
+        paragraph.alignment = _ALIGNMENTS[spec.align]
+        if spec.text:
+            run = paragraph.add_run(spec.text)
+            run.bold = spec.bold
