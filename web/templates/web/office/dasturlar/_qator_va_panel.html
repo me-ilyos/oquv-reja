@@ -1,0 +1,5 @@
+{% include "web/office/dasturlar/_tarix_panel.html" %}
+{# htmx: oob table rows must be wrapped in <template> to parse outside a table #}
+<template>
+{% include "web/office/dasturlar/_qator.html" with oob=True %}
+</template>

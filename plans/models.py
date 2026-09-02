@@ -393,16 +393,19 @@ class TopshirishHolati(models.TextChoices):
 
 
 class DasturTopshirish(models.Model):
-    """One teacher's submitted O'quv Dastur for a course, and its AOH review.
+    """One attempt at submitting a course's O'quv Dastur, and its AOH review.
 
-    One row per FanVariant, not a history table: the teacher revises and
-    resubmits the same record, and resubmission overwrites the file and
-    resets holat to KUTILMOQDA.
+    Append-only: a variant can have many attempts (one per resubmission
+    round), each immutable once reviewed. Never edit or delete a past
+    attempt — that history is what lets both the teacher and the AOH see
+    every prior rejection reason across the several reject/resubmit rounds
+    a dastur typically goes through.
     """
 
-    variant = models.OneToOneField(
-        FanVariant, on_delete=models.CASCADE, related_name="dastur_topshirish"
+    variant = models.ForeignKey(
+        FanVariant, on_delete=models.CASCADE, related_name="dastur_topshirishlari"
     )
+    urinish_raqami = models.PositiveSmallIntegerField()
     oqituvchi = models.ForeignKey(
         OqituvchiProfil, on_delete=models.PROTECT, related_name="dastur_topshirishlari"
     )
@@ -429,4 +432,7 @@ class DasturTopshirish(models.Model):
         ordering = ["-yuborilgan_vaqt"]
 
     def __str__(self) -> str:
-        return f"{self.variant} / {self.get_holat_display()}"
+        return (
+            f"{self.variant} / {self.urinish_raqami}-urinish / "
+            f"{self.get_holat_display()}"
+        )

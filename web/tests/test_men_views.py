@@ -4,6 +4,7 @@ from django.urls import reverse
 
 from accounts.models import Rol
 from plans.dashboard import joriy_akademik_yil
+from plans.dastur.topshirish import dastur_rad_etish, dastur_topshirish
 from plans.models import DasturTopshirish, SoatTuri, Yuklama
 from plans.services import oqituvchi_yillik_yuklamasi
 from plans.tests.factories import (
@@ -12,7 +13,12 @@ from plans.tests.factories import (
     make_oqituvchi,
     make_reja,
 )
-from web.tests.helpers import foydalanuvchi_yarat, login, mudir_yarat
+from web.tests.helpers import (
+    foydalanuvchi_yarat,
+    login,
+    mudir_yarat,
+    office_admin_yarat,
+)
 
 
 class MenYuklamalarimTests(TestCase):
@@ -149,10 +155,66 @@ class MenDasturTopshirishTests(TestCase):
         javob = self.client.post(
             self.url, {"fayl": SimpleUploadedFile("d.docx", b"mazmun")}
         )
-        self.assertRedirects(javob, reverse("men:yuklamalar"))
+        self.assertEqual(javob.status_code, 200)
         self.assertTrue(DasturTopshirish.objects.filter(variant=self.variant).exists())
+        self.assertContains(javob, "KO'RIB CHIQILMOQDA")
 
     def test_notogri_kengaytma_rad_etiladi(self) -> None:
         login(self.client, self.maruza_egasi.foydalanuvchi)
-        self.client.post(self.url, {"fayl": SimpleUploadedFile("d.txt", b"mazmun")})
+        javob = self.client.post(
+            self.url, {"fayl": SimpleUploadedFile("d.txt", b"mazmun")}
+        )
+        self.assertEqual(javob.status_code, 200)
         self.assertFalse(DasturTopshirish.objects.filter(variant=self.variant).exists())
+        self.assertContains(javob, "form-errors")
+
+    def test_kutilayotgan_urinish_ustiga_qayta_topshirib_bolmaydi(self) -> None:
+        login(self.client, self.maruza_egasi.foydalanuvchi)
+        dastur_topshirish(
+            self.variant, self.maruza_egasi, SimpleUploadedFile("v1.docx", b"m")
+        )
+        javob = self.client.post(
+            self.url, {"fayl": SimpleUploadedFile("v2.docx", b"mazmun")}
+        )
+        self.assertEqual(javob.status_code, 200)
+        self.assertEqual(
+            DasturTopshirish.objects.filter(variant=self.variant).count(), 1
+        )
+        self.assertContains(javob, "javob kutilsin")
+
+
+class MenDasturTarixiTests(TestCase):
+    def setUp(self) -> None:
+        self.joriy = joriy_akademik_yil()
+        self.maruza_egasi = make_oqituvchi()
+        reja = make_reja(boshlanish_yili=self.joriy)
+        fan = make_fan(reja, kafedra=self.maruza_egasi.kafedra)
+        self.variant = fan.tanlangan_variant
+        fs = make_fan_semestr(self.variant, semestr=1)
+        Yuklama.objects.create(
+            fan_semestr=fs, tur=SoatTuri.MARUZA, oqituvchi=self.maruza_egasi
+        )
+        self.url = reverse("men:dastur_tarixi", args=[self.variant.pk])
+
+    def test_barcha_urinishlar_yangi_birinchi_korsatiladi(self) -> None:
+        birinchi = dastur_topshirish(
+            self.variant, self.maruza_egasi, SimpleUploadedFile("v1.docx", b"m")
+        )
+        dastur_rad_etish(birinchi, office_admin_yarat(), "Mavzular yetarli emas")
+        dastur_topshirish(
+            self.variant, self.maruza_egasi, SimpleUploadedFile("v2.docx", b"m")
+        )
+
+        login(self.client, self.maruza_egasi.foydalanuvchi)
+        javob = self.client.get(self.url)
+
+        self.assertEqual(javob.status_code, 200)
+        self.assertContains(javob, "1-urinish")
+        self.assertContains(javob, "2-urinish")
+        self.assertContains(javob, "Mavzular yetarli emas")
+
+    def test_begona_kira_olmaydi(self) -> None:
+        begona = make_oqituvchi(kafedra=self.maruza_egasi.kafedra)
+        login(self.client, begona.foydalanuvchi)
+        javob = self.client.get(self.url)
+        self.assertEqual(javob.status_code, 403)

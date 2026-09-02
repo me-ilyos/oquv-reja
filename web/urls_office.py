@@ -10,6 +10,7 @@ from web.views.office.dastur import (
     dastur_fayl,
     dastur_qabul,
     dastur_rad,
+    dastur_tarixi,
 )
 from web.views.office.kafedralar import (
     KafedraListView,
@@ -49,6 +50,7 @@ urlpatterns = [
     path("dasturlar/<int:pk>/qabul/", dastur_qabul, name="dastur_qabul"),
     path("dasturlar/<int:pk>/rad/", dastur_rad, name="dastur_rad"),
     path("dasturlar/<int:pk>/fayl/", dastur_fayl, name="dastur_fayl"),
+    path("dasturlar/<int:variant_id>/tarixi/", dastur_tarixi, name="dastur_tarixi"),
     path("kafedralar/", KafedraListView.as_view(), name="kafedra_list"),
     path("kafedralar/yangi/", KafedraYangiView.as_view(), name="kafedra_yangi"),
     path(

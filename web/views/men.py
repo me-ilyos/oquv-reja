@@ -2,18 +2,17 @@
 
 from collections import defaultdict
 
-from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db.models import Prefetch
 from django.http import FileResponse, HttpRequest, HttpResponse, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse
+from django.shortcuts import get_object_or_404, render
 from django.views import View
 from django.views.generic import TemplateView
 
 from plans import dashboard, services
 from plans.dastur.service import dastur_egasimi, dastur_render
 from plans.dastur.topshirish import dastur_topshirish
-from plans.models import FanVariant, SoatTuri, Yuklama
+from plans.models import DasturTopshirish, FanVariant, SoatTuri, Yuklama
 from web.forms.dastur import DasturTopshirishForm
 from web.mixins import OqituvchiTalabMixin
 from web.views.office.dashboard import yilni_tanlash
@@ -33,10 +32,12 @@ class MenYuklamalarimView(OqituvchiTalabMixin, TemplateView):
         yuklamalar = list(
             Yuklama.objects.filter(oqituvchi=profil)
             .akademik_yilda(yil)
-            .select_related(
-                "fan_semestr__variant__fan__reja",
-                "fan_semestr__variant__dastur_topshirish",
-                "guruh",
+            .select_related("fan_semestr__variant__fan__reja", "guruh")
+            .prefetch_related(
+                Prefetch(
+                    "fan_semestr__variant__dastur_topshirishlari",
+                    queryset=DasturTopshirish.objects.select_related("korib_chiqqan"),
+                )
             )
             .order_by("fan_semestr__variant__nomi", "fan_semestr__semestr", "tur")
         )
@@ -76,18 +77,61 @@ class MenDasturTopshirishView(OqituvchiTalabMixin, View):
                 "Bu fan dasturini faqat ma'ruza egasi topshirishi mumkin."
             )
         form = DasturTopshirishForm(request.POST, request.FILES)
+        xato = None
         if form.is_valid():
             try:
                 dastur_topshirish(variant, profil, form.cleaned_data["fayl"])
-            except ValidationError as xato:
-                messages.error(request, " ".join(xato.messages))
-            else:
-                messages.success(request, "Dastur topshirildi.")
+            except ValidationError as e:
+                xato = " ".join(e.messages)
         else:
-            for xatolar in form.errors.values():
-                for xato in xatolar:
-                    messages.error(request, xato)
-        return redirect(reverse("men:yuklamalar"))
+            xato = " ".join(x for xs in form.errors.values() for x in xs)
+        return _dastur_javobi(request, variant, xato=xato)
+
+
+class MenDasturTarixiView(OqituvchiTalabMixin, View):
+    def get(self, request: HttpRequest, variant_id: int) -> HttpResponse:
+        variant = get_object_or_404(FanVariant, pk=variant_id)
+        profil = getattr(request.user, "oqituvchi_profil", None)
+        if profil is None or not dastur_egasimi(variant, profil):
+            return HttpResponseForbidden(
+                "Bu fan dasturini faqat ma'ruza egasi ko'rishi mumkin."
+            )
+        return render(request, "web/men/_dastur_panel.html", _panel_kontekst(variant))
+
+
+class MenDasturFaylView(OqituvchiTalabMixin, View):
+    def get(self, request: HttpRequest, pk: int) -> HttpResponse:
+        topshirish = get_object_or_404(
+            DasturTopshirish.objects.select_related("variant"), pk=pk
+        )
+        profil = getattr(request.user, "oqituvchi_profil", None)
+        if profil is None or not dastur_egasimi(topshirish.variant, profil):
+            return HttpResponseForbidden(
+                "Bu faylni faqat ma'ruza egasi ko'rishi mumkin."
+            )
+        return FileResponse(topshirish.fayl.open("rb"), as_attachment=True)
+
+
+def _panel_kontekst(
+    variant: FanVariant, *, xato: str | None = None
+) -> dict[str, object]:
+    urinishlar = list(variant.dastur_topshirishlari.select_related("korib_chiqqan"))
+    return {
+        "variant": variant,
+        "urinishlar": urinishlar,
+        "joriy": urinishlar[0] if urinishlar else None,
+        "xato": xato,
+    }
+
+
+def _dastur_javobi(
+    request: HttpRequest, variant: FanVariant, *, xato: str | None = None
+) -> HttpResponse:
+    return render(
+        request,
+        "web/men/_dastur_qator_va_panel.html",
+        _panel_kontekst(variant, xato=xato),
+    )
 
 
 def _tur_jami(yuklamalar: list[Yuklama]) -> list[tuple[str, int]]:
