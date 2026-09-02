@@ -185,6 +185,21 @@ class DasturKontekstTest(TestCase):
         self.assertIn(self.variant.nomi.upper(), muqova_matni)
         self.assertIn("600000 – Aniq fanlar", muqova_matni)
         self.assertIn(str(self.yil), muqova_matni)
+        self.assertIn(f"{self.kafedra.nomi} kafedrasi", muqova_matni)
+
+    def test_tuzuvchi_va_taqrizchi_bosh_qoldiriladi(self) -> None:
+        from docx import Document
+
+        buffer = dastur_render(self.variant)
+        hujjat = Document(buffer)
+        paragraphs = hujjat.paragraphs
+        muqova_matni = "\n".join(p.text for p in paragraphs)
+        self.assertNotIn("Komilov", muqova_matni)
+        self.assertNotIn("Xashimov", muqova_matni)
+
+        for label in ("Tuzuvchi:", "Taqrizchilar:"):
+            idx = next(i for i, p in enumerate(paragraphs) if p.text == label)
+            self.assertEqual(paragraphs[idx + 1].text, "")
 
 
 class DasturFormatlashTest(TestCase):
