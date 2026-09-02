@@ -1,0 +1,20 @@
+<div class="card" style="margin:8px 0 16px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <h2 style="margin:0;">{{ variant.nomi }} — dastur topshirig'i</h2>
+    <button type="button" class="btn" onclick="document.getElementById('dastur-panel-{{ variant.pk }}').innerHTML = ''">Yopish</button>
+  </div>
+  {% if xato %}
+  <div class="form-errors">{{ xato }}</div>
+  {% endif %}
+  {% include "web/dastur/_tarix_royxati.html" with urinishlar=urinishlar fayl_url_nomi="men:dastur_fayl" %}
+  {% if joriy.holat == "KUTILMOQDA" %}
+  <div class="credits" style="margin-top:10px;">Joriy topshiriq hali ko'rib chiqilmoqda — javob kutilsin.</div>
+  {% else %}
+  <form hx-post="{% url 'men:dastur_topshirish' variant.pk %}" hx-target="#dastur-panel-{{ variant.pk }}" hx-swap="innerHTML"
+        enctype="multipart/form-data" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+    {% csrf_token %}
+    <input type="file" name="fayl" accept=".docx" required>
+    <button type="submit" class="btn btn-primary">Topshirish</button>
+  </form>
+  {% endif %}
+</div>

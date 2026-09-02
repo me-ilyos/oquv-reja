@@ -257,6 +257,7 @@ class YuklamaAdmin(admin.ModelAdmin):
 class DasturTopshirishAdmin(admin.ModelAdmin):
     list_display = (
         "variant",
+        "urinish_raqami",
         "oqituvchi",
         "holat",
         "yuborilgan_vaqt",

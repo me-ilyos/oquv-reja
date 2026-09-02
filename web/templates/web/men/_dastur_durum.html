@@ -1,0 +1,12 @@
+{% with joriy=variant.dastur_topshirishlari.all.0 %}
+{% if joriy %}
+<div>
+  {% if joriy.holat == "QABUL_QILINDI" %}<span class="tag tag-mand">QABUL QILINDI</span>
+  {% elif joriy.holat == "RAD_ETILDI" %}<span class="tag tag-rad">RAD ETILDI · {{ joriy.urinish_raqami }}-urinish</span>
+  {% else %}<span class="tag tag-elec">KO'RIB CHIQILMOQDA · {{ joriy.urinish_raqami }}-urinish</span>{% endif %}
+</div>
+{% endif %}
+<button type="button" class="btn" style="margin-top:4px;"
+        hx-get="{% url 'men:dastur_tarixi' variant.pk %}"
+        hx-target="#dastur-panel-{{ variant.pk }}" hx-swap="innerHTML">Ko'rish</button>
+{% endwith %}
