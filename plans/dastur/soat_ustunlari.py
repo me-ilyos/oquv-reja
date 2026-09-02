@@ -12,8 +12,8 @@ from docx.table import Table
 
 from plans.models import FanVariant
 
-JADVAL_INDEKSI = 1
-JADVAL_SONI = 3
+JADVAL_INDEKSI = 2
+JADVAL_SONI = 4
 GRID_USTUNLARI = 11
 
 # Grid column index in Table 1 -> the FanVariant field holding its hours.

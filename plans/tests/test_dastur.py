@@ -221,9 +221,21 @@ class DasturKontekstTest(TestCase):
         muqova_matni = "\n".join(p.text for p in hujjat.paragraphs)
         self.assertNotRegex(muqova_matni, r"\{\{|\{%")
         self.assertIn(self.variant.nomi.upper(), muqova_matni)
-        self.assertIn("600000 – Aniq fanlar", muqova_matni)
         self.assertIn(str(self.yil), muqova_matni)
         self.assertIn(f"{self.kafedra.nomi} kafedrasi", muqova_matni)
+
+    def test_bilim_sohasi_jadvali_toldiriladi(self) -> None:
+        """The bilim/ta'lim sohasi block lives in its own table, not the
+        cover paragraphs — moved there by a manual template edit."""
+        buffer = dastur_render(self.variant)
+        hujjat = Document(buffer)
+        jadval_matni = "\n".join(
+            cell.text
+            for table in hujjat.tables
+            for row in table.rows
+            for cell in row.cells
+        )
+        self.assertIn("600000 – Aniq fanlar", jadval_matni)
 
     def test_tuzuvchi_va_taqrizchi_bosh_qoldiriladi(self) -> None:
         buffer = dastur_render(self.variant)
@@ -268,7 +280,7 @@ class DasturSoatUstunlariTest(TestCase):
         make_fan_semestr(self.variant, semestr=1)
 
     def _jadval1(self, variant):
-        return Document(dastur_render(variant)).tables[1]
+        return Document(dastur_render(variant)).tables[2]
 
     def _grid_kengliklari(self, jadval) -> list[int]:
         return [
@@ -398,12 +410,12 @@ class DasturFormatlashTest(TestCase):
         self.assertEqual(bolim.page_height.twips, 15840)
 
     def test_jadvallar_soni(self) -> None:
-        self.assertEqual(len(self.hujjat.tables), 3)
+        self.assertEqual(len(self.hujjat.tables), 4)
 
     def test_yorliq_qiymatdan_alohida_paragraf(self) -> None:
         """Pins the structural fix: label and value are two paragraphs in
         the same cell, not fused into one."""
-        cell = self.hujjat.tables[1].rows[2].cells[0]
+        cell = self.hujjat.tables[2].rows[2].cells[0]
         self.assertEqual(len(cell.paragraphs), 2)
         self.assertEqual(cell.paragraphs[0].text, "Fan/modul turi")
         self.assertIn("{{ course.module_type }}", cell.paragraphs[1].text)
