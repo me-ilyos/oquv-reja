@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 
 from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.table import Table, _Cell
 from docx.text.paragraph import Paragraph
 
@@ -150,6 +152,91 @@ def wrap_rows(table: Table, first: int, last: int, opener: str, closer: str) -> 
     _tag_row(table.rows[first - 1], opener)
 
 
+def _tc_span(tc) -> int:
+    pr = tc.find(qn("w:tcPr"))
+    gridspan = pr.find(qn("w:gridSpan")) if pr is not None else None
+    return int(gridspan.get(qn("w:val"))) if gridspan is not None else 1
+
+
+def insert_grid_column(
+    table: Table,
+    after_col: int,
+    width: int,
+    *,
+    split_rows: list[int],
+    widen_rows: list[int],
+    widen_last_cell_rows: list[int] = (),
+) -> None:
+    """Inserts a new grid column right after 0-based grid index `after_col`,
+    splitting `width` out of that column's own width.
+
+    Only rows named in `split_rows`, `widen_rows`, or `widen_last_cell_rows`
+    are touched — every other row is left with its existing gridSpans, which
+    silently keep covering the new column (correct for a row whose cell
+    already spans past the insertion point, e.g. a full-width section header
+    two rows up). `split_rows` get a fresh blank `w:tc` spliced in after the
+    cell covering `after_col`; `widen_rows` get that cell's `gridSpan` grown
+    by one instead (a header spanning the insertion point widens rather than
+    splitting). `widen_last_cell_rows` is for a row whose own cells don't
+    straddle `after_col` at all (e.g. its own trailing cell already starts
+    after it) but still needs to reach the new final column — its *last*
+    cell grows by one, regardless of where `after_col` falls.
+    """
+    grid = table._tbl.find(qn("w:tblGrid"))
+    gridcols = grid.findall(qn("w:gridCol"))
+    old_width = int(gridcols[after_col].get(qn("w:w")))
+    gridcols[after_col].set(qn("w:w"), str(old_width - width))
+    new_gridcol = OxmlElement("w:gridCol")
+    new_gridcol.set(qn("w:w"), str(width))
+    gridcols[after_col].addnext(new_gridcol)
+
+    targets = set(split_rows) | set(widen_rows)
+    for row_idx, tr in enumerate(table._tbl.findall(qn("w:tr")), start=1):
+        if row_idx in widen_last_cell_rows:
+            tc = tr.findall(qn("w:tc"))[-1]
+            span = _tc_span(tc)
+            tc.find(qn("w:tcPr")).find(qn("w:gridSpan")).set(qn("w:val"), str(span + 1))
+            continue
+        if row_idx not in targets:
+            continue
+        col = 0
+        for tc in tr.findall(qn("w:tc")):
+            span = _tc_span(tc)
+            if col <= after_col < col + span:
+                if row_idx in widen_rows:
+                    tcPr = tc.find(qn("w:tcPr"))
+                    tcPr.find(qn("w:gridSpan")).set(qn("w:val"), str(span + 1))
+                else:
+                    new_tc = copy.deepcopy(tc)
+                    for p in new_tc.findall(qn("w:p")):
+                        for run in p.findall(qn("w:r")):
+                            p.remove(run)
+                    tc.addnext(new_tc)
+                break
+            col += span
+
+    _recompute_widths(table)
+
+
+def _recompute_widths(table: Table) -> None:
+    """Rewrites every cell's w:tcW from the current tblGrid, so no row
+    disagrees with the table about where its column boundaries fall --
+    needed after insert_grid_column, since gridSpan changes don't update a
+    cell's own stored width."""
+    widths = [
+        int(gridcol.get(qn("w:w")))
+        for gridcol in table._tbl.find(qn("w:tblGrid")).findall(qn("w:gridCol"))
+    ]
+    for tr in table._tbl.findall(qn("w:tr")):
+        col = 0
+        for tc in tr.findall(qn("w:tc")):
+            span = _tc_span(tc)
+            tcW = tc.find(qn("w:tcPr")).find(qn("w:tcW"))
+            if tcW is not None:
+                tcW.set(qn("w:w"), str(sum(widths[col : col + span])))
+            col += span
+
+
 # --------------------------------------------------------------------------
 # the edits
 # --------------------------------------------------------------------------
@@ -201,18 +288,48 @@ def edit_cover(doc: Document) -> None:
     set_para_text(body_para(doc, "S.Xashimov"), "")
 
 
+def add_seminar_column(doc: Document) -> None:
+    """Splits a new "Seminar" grid column out of the reference document's
+    fixed 3-hour-column layout (Ma'ruza/Amaliy/Lab-ya), right after Lab-ya.
+
+    Must run first, against the untouched 98-row table, so the row numbers
+    below are stable and correspond 1:1 to the reference document's actual
+    layout: row 4 is the "Auditoriya mashg'ulotlari" header (grid 4-6, must
+    widen to 4-7 to cover Seminar too); rows 5-6 are the per-column
+    sub-header and value rows (each gets its own new blank cell); rows 7-98
+    are every full-width row after section 1 (section banners, teacher-fill
+    rows, lesson data rows) — they already span the whole table width and
+    must widen by one column to keep doing so. Rows 1-3 are left alone: the
+    cells that happen to end at grid column 6 there ("Semestr", "O'quv
+    rejadagi tartib raqami") are unrelated to the hour columns.
+    """
+    t = doc.tables[1]
+    insert_grid_column(
+        t,
+        after_col=6,
+        width=360,
+        split_rows=[5, 6],
+        widen_rows=[1, 4, *range(7, len(t.rows) + 1)],
+        widen_last_cell_rows=[2, 3],
+    )
+    set_cell(t, 5, 8, "Seminar")
+    set_cell(t, 6, 8, "{{ hours.seminar }}")
+
+
 def edit_fan_malumotlari(doc: Document) -> None:
     """Section 1, table[1] rows 1-6. Vertically merged block — scalar edits
-    only, no rows added or removed."""
+    only, no rows added or removed. Columns 9+ are one higher than the
+    reference document's own numbering, since add_seminar_column() already
+    spliced in a new column 8 (Seminar) before this runs."""
     t = doc.tables[1]
     set_cell(t, 2, 1, "{{ course.code }}", idx=1)
     set_cell(t, 2, 4, "{{ academic_years_str }}", idx=1)
     set_cell(t, 2, 5, "{{ semesters_str }}", idx=1)
-    set_cell(t, 2, 8, "{{ credits_str }}", idx=1)
+    set_cell(t, 2, 9, "{{ credits_str }}", idx=1)
     set_cell(t, 3, 1, "{{ course.module_type }}", idx=1)
     set_cell(t, 3, 4, "{{ language }}", idx=1)
     set_cell(t, 3, 5, "{{ plan_number }}", idx=1)
-    set_cell(t, 3, 8, "{{ weekly_hours_str }}", idx=1)
+    set_cell(t, 3, 9, "{{ weekly_hours_str }}", idx=1)
     set_cell(t, 4, 1, "{{ course.name }}", idx=1)
 
     retext_paragraph(
@@ -224,8 +341,8 @@ def edit_fan_malumotlari(doc: Document) -> None:
     set_cell(t, 6, 5, "{{ hours.lecture }}")
     set_cell(t, 6, 6, "{{ hours.practice }}")
     set_cell(t, 6, 7, "{{ hours.lab }}")
-    set_cell(t, 6, 8, "{{ hours.self_study }}")
-    set_cell(t, 6, 9, "{{ hours.coursework }}")
+    set_cell(t, 6, 9, "{{ hours.self_study }}")
+    set_cell(t, 6, 10, "{{ hours.coursework }}")
 
 
 def edit_mazmuni(doc: Document) -> None:
@@ -276,7 +393,8 @@ def edit_outcomes(doc: Document) -> None:
 
 
 def edit_topics(doc: Document) -> None:
-    """Section 5: M1-12/A1-12/L1-12 -> one data row + loop per lesson type.
+    """Section 5: M1-12/A1-12/L1-12 -> one data row + loop per lesson type,
+    plus a cloned Seminar (S) block the reference document doesn't have.
     Collapses run bottom-up (a block only shifts rows below it), but since
     later collapses (A, then M) sit above earlier ones, every anchor is
     re-found by content once all three collapses are done."""
@@ -293,13 +411,42 @@ def edit_topics(doc: Document) -> None:
     for row in (l1, a1, m1):
         set_cell(t, row, 1, "{{ t.code }}")
         set_cell(t, row, 2, "{{ t.title }}")
-        set_cell(t, row, 10, "{{ t.hours }}")
-    set_cell(t, m1 - 1, 10, "{{ hours.lecture }}")
-    set_cell(t, a_hdr, 10, "{{ hours.practice }}")
-    set_cell(t, l_hdr, 10, "{{ hours.lab }}")
+        set_cell(t, row, 11, "{{ t.hours }}")
+    set_cell(t, m1 - 1, 11, "{{ hours.lecture }}")
+    set_cell(t, a_hdr, 11, "{{ hours.practice }}")
+    set_cell(t, l_hdr, 11, "{{ hours.lab }}")
     wrap_rows(t, l1, l1, "{%tr for t in labs %}", "{%tr endfor %}")
     wrap_rows(t, a1, a1, "{%tr for t in practicals %}", "{%tr endfor %}")
     wrap_rows(t, m1, m1, "{%tr for t in lectures %}", "{%tr endfor %}")
+
+    _add_seminar_block(t)
+
+
+def _add_seminar_block(t: Table) -> None:
+    """Appends a Seminar (S) sub-header + {%tr for%} loop right after the
+    Laboratoriya block, same 4-row shape as M/A/L (sub-header, for-open,
+    data, endfor -- no if/endif, matching those blocks exactly). Built the
+    same way wrap_rows builds a control row: clone an existing row for its
+    formatting, then retext every cell. The reference document has no
+    seminar section at all, so this whole block is new."""
+    l_hdr = find_row(t, "Laboratoriya mashg‘ulot (L)")
+    l_endfor = find_row(t, "{%tr endfor %}", start=l_hdr)
+    anchor = t.rows[l_endfor - 1]._tr
+
+    for _ in range(4):
+        clone = copy.deepcopy(anchor)
+        anchor.addnext(clone)
+        anchor = clone
+
+    s_hdr, s_for, s_data, s_endfor = range(l_endfor + 1, l_endfor + 5)
+    _tag_row(t.rows[s_hdr - 1], "")
+    set_cell(t, s_hdr, 2, "Seminar (S)")
+    set_cell(t, s_hdr, 11, "{{ hours.seminar }}")
+    _tag_row(t.rows[s_for - 1], "{%tr for t in seminars %}")
+    set_cell(t, s_data, 1, "{{ t.code }}")
+    set_cell(t, s_data, 2, "{{ t.title }}")
+    set_cell(t, s_data, 11, "{{ t.hours }}")
+    _tag_row(t.rows[s_endfor - 1], "{%tr endfor %}")
 
 
 def edit_self_study(doc: Document) -> None:
@@ -307,11 +454,11 @@ def edit_self_study(doc: Document) -> None:
     t = doc.tables[1]
     hdr = find_row(t, "Mustaqil ta’lim topshiriqlari")
     task1 = hdr + 1
-    set_cell(t, hdr, 10, "{{ hours.self_study }}")
+    set_cell(t, hdr, 11, "{{ hours.self_study }}")
     delete_rows(t, task1 + 1, len(t.rows))  # tasks 2-27
     set_cell(t, task1, 1, "{{ loop.index }}")
     set_cell(t, task1, 2, "{{ t.title }}")
-    set_cell(t, task1, 10, "{{ t.hours }}")
+    set_cell(t, task1, 11, "{{ t.hours }}")
     wrap_rows(t, task1, task1, "{%tr for t in self_study_tasks %}", "{%tr endfor %}")
 
 
@@ -325,6 +472,7 @@ def main() -> int:
 
     doc = Document(SOURCE)
     for step in (
+        add_seminar_column,
         edit_cover,
         edit_fan_malumotlari,
         edit_mazmuni,
