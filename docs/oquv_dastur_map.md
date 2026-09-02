@@ -6,11 +6,14 @@ The platform **generates** this document with course metadata pre-filled. Teache
 
 `plans/dastur/oquv_dastur.docx` is a hand-editable Word file, not code-generated. It was produced once by `scripts/make_dastur_template.py`, which opens
 `sources/Kiberxavfsizlik_asoslari_fan_dasturi_ATDT.docx` (a real, fully populated dastur) read-only, swaps concrete values for docxtpl Jinja tags, and
-collapses repeating rows into `{%tr for %}` loops — keeping every border, merge, and font byte-for-byte. Re-run that script only if the university
-reissues the reference form; otherwise edit `plans/dastur/oquv_dastur.docx` directly in Word (reword a heading, adjust a border) the same way any other
-document is edited. At runtime, `plans/dastur/service.py::dastur_render()` renders that template via `docxtpl.DocxTemplate`, using the context built by
-`plans/dastur/kontekst.py::dastur_kontekst()`, then `plans/dastur/soat_ustunlari.py::soat_ustunlarini_tozala()` cuts out the hour columns and section-5
-sub-headers a course has no hours for (docxtpl can't remove a table column, so this is post-render OOXML surgery — see §3 and §9 below).
+collapses repeating rows into `{%tr for %}` loops — keeping every border, merge, and font byte-for-byte. The one structural addition over the reference
+document itself is a fourth hour column, **Seminar** (`add_seminar_column()`, run before any other edit) — the reference document only has
+Ma'ruza/Amaliy/Lab-ya, but `FanVariant.seminar_soat` is a real, independent hours field, so the template needs its own column and section-5 loop for it
+(see §3, §5, §9). Re-run the script only if the university reissues the reference form; otherwise edit `plans/dastur/oquv_dastur.docx` directly in Word
+(reword a heading, adjust a border) the same way any other document is edited. At runtime, `plans/dastur/service.py::dastur_render()` renders that
+template via `docxtpl.DocxTemplate`, using the context built by `plans/dastur/kontekst.py::dastur_kontekst()`, then
+`plans/dastur/soat_ustunlari.py::soat_ustunlarini_tozala()` cuts out the hour columns and section-5 sub-headers a course has no hours for (docxtpl can't
+remove a table column, so this is post-render OOXML surgery).
 
 ---
 
@@ -84,9 +87,9 @@ Row 2:  Fan/modul turi     │ Ta'lim tili      │ Tartib raqami    │ Haftada
 Row 3:  Fanning nomi       │ Jami yuklama     │ Auditoriya jami – {N} soat   │ Mustaqil  │ Kurs ishi
         {course_title}     │ (soat)           │ shundan:                     │ ta'lim    │
         ──────┼             ┼──────────────────┼──────────────────────────────┼           │
-Row 4:  (merged↑)          │ (merged↑)        │ Ma'ruza │ Amaliy │ Lab-ya   │ (merged↑) │ (merged↑)
-        ──────┼─────────────┼──────────────────┼─────────┼────────┼──────────┼───────────┼──────────
-Row 5:  (empty, span=3)    │ {total_hrs}      │{lec_hrs}│{pra_hr}│{lab_hrs} │{indep_hrs}│ {- or KI}
+Row 4:  (merged↑)          │ (merged↑)        │ Ma'ruza │ Amaliy │ Lab-ya │ Seminar │ (merged↑) │ (merged↑)
+        ──────┼─────────────┼──────────────────┼─────────┼────────┼────────┼─────────┼───────────┼──────────
+Row 5:  (empty, span=3)    │ {total_hrs}      │{lec_hrs}│{pra_hr}│{lab_hrs}│{sem_hrs}│{indep_hrs}│ {- or KI}
 ```
 
 ### Pre-fill field mapping:
@@ -104,15 +107,16 @@ Row 5:  (empty, span=3)    │ {total_hrs}      │{lec_hrs}│{pra_hr}│{lab_h
 | R3.C0 | Fanning nomi | O'quv Reja → course title | Spans 3 grid columns, merged vertically with R4–R5 |
 | R3.C1 | Jami yuklama (soat) | Label only | Value goes in R5 |
 | R3.C2 | Auditoriya mashg'ulotlari jami | Computed | `Auditoriya mashg'ulotlari jami – {N} soat, shundan:` |
-| R4.C2–C4 | Ma'ruza / Amaliy / Lab-ya | Labels | Only include columns for hour types that exist (>0) |
+| R4.C2–C5 | Ma'ruza / Amaliy / Lab-ya / Seminar | Labels | Only include columns for hour types that exist (>0) |
 | R5.C1 | Total hours value | O'quv Reja → total hours | e.g., `180` |
 | R5.C2 | Lecture hours | O'quv Reja → ma'ruza hours | e.g., `24` |
 | R5.C3 | Practice hours | O'quv Reja → amaliy hours | e.g., `24` |
 | R5.C4 | Lab hours | O'quv Reja → lab hours | e.g., `24`. Omit column if 0. |
-| R5.C5 | Independent study hours | O'quv Reja → mustaqil ta'lim | e.g., `108` |
-| R5.C6 | Course project | O'quv Reja → kurs ishi | `-` if none, `Kurs ishi` if present |
+| R5.C5 | Seminar hours | O'quv Reja → seminar hours | e.g., `8`. Omit column if 0. |
+| R5.C6 | Independent study hours | O'quv Reja → mustaqil ta'lim | e.g., `108` |
+| R5.C7 | Course project | O'quv Reja → kurs ishi | `-` if none, `Kurs ishi` if present |
 
-> **Note on the hour columns:** the reference document — and therefore the template — has exactly three hour-type columns: `Ma'ruza`, `Amaliy`, `Lab-ya`. There is no Seminar column. A column is dropped entirely (not just shown as `-`) when that hour type is zero, implemented as post-render OOXML surgery in `plans/dastur/soat_ustunlari.py::soat_ustunlarini_tozala()`, since docxtpl can only substitute tags, not remove table columns. The freed width is spread evenly across the surviving hour columns so the table stays full width. If all three are zero, nothing is deleted — removing all three would leave the "Auditoriya" header cell spanning zero grid columns, which is invalid OOXML.
+> **Note on the hour columns:** the template has **four** hour-type columns — `Ma'ruza`, `Amaliy`, `Lab-ya`, `Seminar` — even though the reference document itself only has the first three; `Seminar` was added at build time by `scripts/make_dastur_template.py::add_seminar_column()`, since `FanVariant.seminar_soat` is a real, independent hours field distinct from `laboratoriya_soat` and a course can have both non-zero at once (both must then render side by side). A column is dropped entirely (not just shown as `-`) when that hour type is zero, implemented as post-render OOXML surgery in `plans/dastur/soat_ustunlari.py::soat_ustunlarini_tozala()`, since docxtpl can only substitute tags, not remove table columns. The freed width is spread evenly across the surviving hour columns so the table stays full width. If all four are zero, nothing is deleted — removing all four would leave the "Auditoriya" header cell spanning zero grid columns, which is invalid OOXML.
 
 ---
 
@@ -152,22 +156,29 @@ Row M+2:  "A2"  |  {empty}                                 |  2
 Row L+0:  ""    |  "Laboratoriya mashg'ulot (L)"           |  {total_lab_hours}
 Row L+1:  "L1"  |  {empty}                                 |  2
   ...           (one row per lesson: total = lab_hours / 2)
+
+Row S+0:  ""    |  "Seminar (S)"                           |  {total_seminar_hours}
+Row S+1:  "S1"  |  {empty}                                 |  2
+  ...           (one row per lesson: total = seminar_hours / 2)
 ```
+
+Sub-sections always appear in this order — Ma'ruza, Amaliy, Laboratoriya, Seminar — regardless of which hour types a given course actually has.
 
 ### Pre-fill rules:
 
 | What | Value | Source |
 |---|---|---|
-| Sub-section headers | `Ma'ruza (M)`, `Amaliy mashg'ulot (A)`, `Laboratoriya mashg'ulot (L)` | Static text, already in the template |
+| Sub-section headers | `Ma'ruza (M)`, `Amaliy mashg'ulot (A)`, `Laboratoriya mashg'ulot (L)`, `Seminar (S)` | Static text, already in the template |
 | Total hours per sub-section | The number in the last column of the header row | O'quv Reja |
 | Number of lesson rows | `hours / 2` per type | Computed by `bosh_mavzular()` |
-| Row labels | `M1`, `M2`, ..., `A1`, `A2`, ..., `L1`, `L2`, ... | Sequential |
+| Row labels | `M1`, `M2`, ..., `A1`, `A2`, ..., `L1`, `L2`, ..., `S1`, `S2`, ... | Sequential |
 | Hours per lesson | Always `2` | Hardcoded |
 | Topic/description cell | **Empty** | Teacher fills |
 
 **Only include sub-sections for hour types that have non-zero hours.** If a course has no lab hours, `soat_ustunlarini_tozala()` removes the
 Laboratoriya sub-header row entirely at render time — it sits outside its `{%tr for%}` loop, so an empty `labs` list alone would leave the header
-behind with a bare `-`.
+behind with a bare `-`. Same rule applies independently to each of the four types, so a course with lab hours but no seminar hours (or vice versa)
+keeps one sub-section and drops the other.
 
 ---
 
@@ -257,6 +268,8 @@ The document structure adapts to the course:
 | No lecture hours | Section 1's Ma'ruza column and Section 5's `Ma'ruza (M)` sub-header row are both removed |
 | No practice hours | Section 1's Amaliy column and Section 5's `Amaliy mashg'ulot (A)` sub-header row are both removed |
 | No lab hours | Section 1's Lab-ya column and Section 5's `Laboratoriya mashg'ulot (L)` sub-header row are both removed |
-| All three hour types zero | Nothing is removed — deleting all three would leave the "Auditoriya" header cell spanning zero grid columns |
+| No seminar hours | Section 1's Seminar column and Section 5's `Seminar (S)` sub-header row are both removed |
+| Lab and Seminar both non-zero | Both columns render side by side — they're independent fields (`laboratoriya_soat` / `seminar_soat`), not alternatives |
+| All four hour types zero | Nothing is removed — deleting all four would leave the "Auditoriya" header cell spanning zero grid columns |
 | No course project | Row 5 last cell = `-` instead of `Kurs ishi` |
 | Multi-semester course | Comma-separated semesters and years in Section 1 |
