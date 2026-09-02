@@ -1,4 +1,4 @@
-# Deployment (Ubuntu 22.04, SQLite)
+# Deployment (Ubuntu 22.04, PostgreSQL)
 
 Deploys this Django app behind Gunicorn + Nginx. Another app on this VPS
 already uses port 8000, so Gunicorn here binds to **127.0.0.1:8001** instead —
@@ -17,10 +17,11 @@ server IP.
 
 ```bash
 sudo apt update
-sudo apt install -y python3-venv python3-pip git nginx
+sudo apt install -y python3-venv python3-pip git nginx postgresql postgresql-contrib libpq-dev
 ```
 
-Skip `nginx` if it's already installed and running the other app.
+Skip `nginx` if it's already installed and running the other app. Skip
+`postgresql` if this VPS already runs a Postgres server you'll reuse.
 
 ## 2. Get the code
 
@@ -41,9 +42,23 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## 4. Environment file
+## 4. Database
 
-`settings.py` reads `.env` via `django-environ`. Create it:
+Create the Postgres role and database:
+
+```bash
+sudo -u postgres psql -c "CREATE USER oquv_reja WITH PASSWORD 'replace-with-a-strong-password';"
+sudo -u postgres psql -c "CREATE DATABASE oquv_reja OWNER oquv_reja;"
+```
+
+## 5. Environment file
+
+`settings.py` reads `.env` via `django-environ`. Copy `.env.example` and fill
+it in:
+
+```bash
+cp .env.example .env
+```
 
 ```bash
 cat > .env <<'EOF'
@@ -51,6 +66,7 @@ SECRET_KEY=replace-with-a-long-random-value
 DEBUG=False
 ALLOWED_HOSTS=YOUR_VPS_IP
 CSRF_TRUSTED_ORIGINS=http://YOUR_VPS_IP:8080
+DATABASE_URL=postgres://oquv_reja:replace-with-a-strong-password@localhost:5432/oquv_reja
 EOF
 chmod 600 .env
 ```
@@ -66,25 +82,16 @@ Generate a secret key:
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
-## 5. Database, static files, superuser
-
-SQLite needs no separate service — the DB file is created on first migrate.
+## 6. Migrate, static files, superuser
 
 ```bash
 python manage.py migrate
 python manage.py collectstatic --noinput
 python manage.py createsuperuser
-```
-
-Make sure the app user can write to the SQLite file and its directory
-(SQLite needs to create `db.sqlite3-wal`/`-shm` alongside it):
-
-```bash
 mkdir -p media
-chmod 664 db.sqlite3 2>/dev/null || true
 ```
 
-## 6. Gunicorn systemd service
+## 7. Gunicorn systemd service
 
 ```bash
 sudo tee /etc/systemd/system/oquv_reja.service > /dev/null <<'EOF'
@@ -116,7 +123,7 @@ sudo systemctl enable --now oquv_reja
 sudo systemctl status oquv_reja
 ```
 
-## 7. Nginx reverse proxy
+## 8. Nginx reverse proxy
 
 Create a new server block file — it's independent of whatever config serves
 the other app, so this won't disturb it:
@@ -157,7 +164,7 @@ Visit `http://YOUR_VPS_IP:8080/` to confirm it's serving.
 If you get a domain later, swap `server_name _;` for the real domain,
 `listen 8080` back to `listen 80;`, and see the HTTPS note below.
 
-## 8. Firewall
+## 9. Firewall
 
 Nginx's new port needs to be reachable from outside; Gunicorn stays on
 localhost.
@@ -169,14 +176,14 @@ sudo ufw status
 
 Do **not** open port 8001 externally — only Nginx (8080) should be exposed.
 
-## 9. HTTPS
+## 10. HTTPS
 
 Skipped for now — Let's Encrypt/certbot issues certificates for domain
 names, not bare IPs, so TLS isn't available until you point a domain at
 this server. Revisit this once you have one; at that point switch Nginx
 back to port 80/443 and run `certbot --nginx -d your-domain`.
 
-## 10. Deploying updates
+## 11. Deploying updates
 
 ```bash
 cd /srv/oquv_reja
@@ -188,14 +195,12 @@ python manage.py collectstatic --noinput
 sudo systemctl restart oquv_reja
 ```
 
-## 11. Backups
+## 12. Backups
 
-SQLite is a single file — back it up before every migration and on a
-schedule:
+Back up the database before every migration and on a schedule:
 
 ```bash
-cp /srv/oquv_reja/db.sqlite3 /srv/oquv_reja/backups/db-$(date +%F).sqlite3
+pg_dump -U oquv_reja -h localhost oquv_reja > /srv/oquv_reja/backups/db-$(date +%F).sql
 ```
 
-Consider a cron job for this since there's no separate DB server doing it
-for you.
+Consider a cron job for this.
