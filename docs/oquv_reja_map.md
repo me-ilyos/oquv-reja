@@ -34,9 +34,10 @@ Metadata fields are scattered across the first ~8 rows. There is **no fixed row 
 
 | Field | Column observed at | Row observed at |
 |---|---|---|
-| `Akademik daraja` | C17, C35, C70, C75, C80, C81 | R2, R3, R5 |
-| `O'qish muddati` / `O'quv muddati` | C17, C35, C70, C75, C80, C81 | R3, R4, R6 |
-| `Ta'lim shakli` | C17, C35, C70, C75, C80, C81 | R5, R6, R7 |
+| `Akademik daraja` | BR-CC (≈ C70-C81) | R2, R3, R5 |
+| `O'qish muddati` / `O'quv muddati` | BR-CC (≈ C70-C81) | R3, R4, R6 |
+| `O'qish shakli` (study system) | BR-CC (≈ C70-C81), same column as `Ta'lim shakli` | one row **above** `Ta'lim shakli` |
+| `Ta'lim shakli` | BR-CC (≈ C70-C81) | R5, R6, R7 |
 | `Ta'lim yo'nalishi` | C17, C19, C35 | R3, R5 |
 | `O'quv yili` | C30, C35, C75, C80, C81 | R4, R7 |
 
@@ -53,9 +54,20 @@ Metadata fields are scattered across the first ~8 rows. There is **no fixed row 
 - Extract: the integer before `yil`. Possible values: `3`, `4`, `5`.
 - This value determines semester count: 3 years = 6 semesters, 4 years = 8, 4.5 years = 9, 5 years = 10.
 
+**O'qish shakli** (study system — not the same field as `Ta'lim shakli`)
+- Text pattern: `O'qish shakli - Kredit-modul`
+- Values observed: `Kredit-modul` (14 files), `kredit tizimi` (3), `Kredit modul` (1, no hyphen).
+- Sits one row **above** `Ta'lim shakli`, same column. Every sheet has both
+  cells, and both contain the bare substring `shakli` — matching on `shakli`
+  alone hits this cell first and silently produces the wrong `talim_shakli`
+  value. The label match must use the full two-word needle `ta'lim shakli`.
+- This field is not currently stored; it exists only to explain the collision.
+
 **Ta'lim shakli**
 - Text pattern: `Ta'lim shakli - kunduzgi`
-- Extract: value after `-`. One of: `kunduzgi`, `kechgi`, `sirtqi` (case varies).
+- Extract: value after `-`. One of: `kunduzgi`, `kechgi`/`kechki`, `sirtqi` (case varies).
+- Must match the full two-word label `ta'lim shakli`, not the bare `shakli` —
+  see `O'qish shakli` above.
 
 **Ta'lim yo'nalishi**
 - Two formats exist:
@@ -261,7 +273,8 @@ These rows should be **skipped** by the course parser. Detect them by checking i
 
 | Property | Range of values | How to detect |
 |---|---|---|
-| Metadata column | C17 – C81 | Text search in rows 1–10 |
+| Metadata column | BR-CC (≈ C70-C81) | Text search in rows 1–10 |
+| `O'qish shakli` vs `Ta'lim shakli` | Both contain `shakli`; `O'qish shakli` sits one row above | Match the full two-word label `ta'lim shakli`, never the bare `shakli` |
 | `II. O'QUV REJASI` row | R23 – R28 | Text search in C1–C4 |
 | Hour-type header row | R26 – R31 | Search for `Ma'ruza` label |
 | Column spacing | 2, 3, or 5 cols apart | Label-based lookup |
