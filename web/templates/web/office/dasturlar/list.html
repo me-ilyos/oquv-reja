@@ -1,0 +1,82 @@
+{% extends "web/base.html" %}
+{% block title %}Dastur topshiriqlari{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="title">Dastur topshiriqlari</div>
+  </div>
+  <div class="controls">
+    <form method="get">
+      <select name="holat" onchange="this.form.submit()">
+        <option value="">Barcha holatlar</option>
+        <option value="KUTILMOQDA" {% if holat == "KUTILMOQDA" %}selected{% endif %}>Ko'rib chiqilmoqda</option>
+        <option value="QABUL_QILINDI" {% if holat == "QABUL_QILINDI" %}selected{% endif %}>Qabul qilindi</option>
+        <option value="RAD_ETILDI" {% if holat == "RAD_ETILDI" %}selected{% endif %}>Rad etildi</option>
+      </select>
+    </form>
+  </div>
+</div>
+<div x-data="{ qidiruv: '' }">
+  <div class="controls" style="margin-bottom:10px;">
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" placeholder="Fan yoki o'qituvchi" x-model="qidiruv">
+    </div>
+  </div>
+  <div class="table-wrap narrow cards">
+    <table>
+      <thead>
+        <tr>
+          <th>Fan</th>
+          <th>Kafedra</th>
+          <th>O'qituvchi</th>
+          <th>Yuborilgan vaqt</th>
+          <th>Holat</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in topshirishlar %}
+        <tr data-nomi="{{ t.variant.nomi|lower }} {{ t.oqituvchi|stringformat:'s'|lower }}"
+            x-show="qidiruv === '' || $el.dataset.nomi.includes(qidiruv.toLowerCase())">
+          <td data-label="Fan">
+            <span class="code">{{ t.variant.kodi|default:"" }}</span>
+            <strong>{{ t.variant.nomi }}</strong>
+          </td>
+          <td data-label="Kafedra">{{ t.variant.kafedra.nomi|default:"—" }}</td>
+          <td data-label="O'qituvchi">{{ t.oqituvchi }}</td>
+          <td data-label="Yuborilgan vaqt">{{ t.yuborilgan_vaqt|date:"d.m.Y H:i" }}</td>
+          <td data-label="Holat">
+            {% if t.holat == "QABUL_QILINDI" %}<span class="tag tag-mand">QABUL QILINDI</span>
+            {% elif t.holat == "RAD_ETILDI" %}<span class="tag tag-rad">RAD ETILDI</span>
+            {% else %}<span class="tag tag-elec">KO'RIB CHIQILMOQDA</span>{% endif %}
+            {% if t.izoh %}<div class="credits">{{ t.izoh }}</div>{% endif %}
+          </td>
+          <td style="white-space:nowrap;">
+            <a class="btn" href="{% url 'office:dastur_fayl' t.pk %}">Faylni ochish</a>
+            {% if t.holat != "QABUL_QILINDI" %}
+            <form method="post" action="{% url 'office:dastur_qabul' t.pk %}" style="display:inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-primary">Qabul qilish</button>
+            </form>
+            {% endif %}
+            {% if t.holat != "RAD_ETILDI" %}
+            <details style="display:inline-block;">
+              <summary class="btn btn-danger" style="display:inline-block;cursor:pointer;">Rad etish</summary>
+              <form method="post" action="{% url 'office:dastur_rad' t.pk %}" style="margin-top:6px;">
+                {% csrf_token %}
+                <textarea name="izoh" rows="2" placeholder="Sababi" required style="width:200px;display:block;"></textarea>
+                <button type="submit" class="btn btn-danger" style="margin-top:4px;">Yuborish</button>
+              </form>
+            </details>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6"><div class="empty-state">Hozircha dastur topshirilmagan.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

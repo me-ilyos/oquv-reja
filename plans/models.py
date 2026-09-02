@@ -1,8 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q, Sum
+from django.utils import timezone
 
-from accounts.models import Department, OqituvchiProfil
+from accounts.models import Department, Foydalanuvchi, OqituvchiProfil
 from parser.models import derived_credits
 from plans.managers import (
     FanManager,
@@ -383,3 +384,49 @@ class Yuklama(models.Model):
                     )
                 }
             )
+
+
+class TopshirishHolati(models.TextChoices):
+    KUTILMOQDA = "KUTILMOQDA", "Ko'rib chiqilmoqda"
+    QABUL_QILINDI = "QABUL_QILINDI", "Qabul qilindi"
+    RAD_ETILDI = "RAD_ETILDI", "Rad etildi"
+
+
+class DasturTopshirish(models.Model):
+    """One teacher's submitted O'quv Dastur for a course, and its AOH review.
+
+    One row per FanVariant, not a history table: the teacher revises and
+    resubmits the same record, and resubmission overwrites the file and
+    resets holat to KUTILMOQDA.
+    """
+
+    variant = models.OneToOneField(
+        FanVariant, on_delete=models.CASCADE, related_name="dastur_topshirish"
+    )
+    oqituvchi = models.ForeignKey(
+        OqituvchiProfil, on_delete=models.PROTECT, related_name="dastur_topshirishlari"
+    )
+    fayl = models.FileField(upload_to="dasturlar/%Y/")
+    holat = models.CharField(
+        max_length=20,
+        choices=TopshirishHolati.choices,
+        default=TopshirishHolati.KUTILMOQDA,
+    )
+    izoh = models.TextField(blank=True)
+    yuborilgan_vaqt = models.DateTimeField(default=timezone.now)
+    korib_chiqilgan_vaqt = models.DateTimeField(null=True, blank=True)
+    korib_chiqqan = models.ForeignKey(
+        Foydalanuvchi,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    class Meta:
+        verbose_name = "Dastur topshirig'i"
+        verbose_name_plural = "Dastur topshiriqlari"
+        ordering = ["-yuborilgan_vaqt"]
+
+    def __str__(self) -> str:
+        return f"{self.variant} / {self.get_holat_display()}"

@@ -4,6 +4,7 @@ from django.db.models import QuerySet, Sum
 from django.http import HttpRequest
 
 from plans.models import (
+    DasturTopshirish,
     Fan,
     FanSemestr,
     FanTuri,
@@ -248,5 +249,33 @@ class YuklamaAdmin(admin.ModelAdmin):
                 "fan_semestr__variant__fan__reja",
                 "oqituvchi__foydalanuvchi",
                 "guruh",
+            )
+        )
+
+
+@admin.register(DasturTopshirish)
+class DasturTopshirishAdmin(admin.ModelAdmin):
+    list_display = (
+        "variant",
+        "oqituvchi",
+        "holat",
+        "yuborilgan_vaqt",
+        "korib_chiqilgan_vaqt",
+        "korib_chiqqan",
+    )
+    list_filter = ("holat",)
+    search_fields = (
+        "variant__nomi",
+        "variant__kodi",
+        "oqituvchi__foydalanuvchi__first_name",
+    )
+    autocomplete_fields = ("variant", "oqituvchi", "korib_chiqqan")
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "variant__fan__reja", "oqituvchi__foydalanuvchi", "korib_chiqqan"
             )
         )
