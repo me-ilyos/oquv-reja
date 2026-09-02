@@ -143,6 +143,16 @@ class DasturKontekstTest(TestCase):
     def test_nol_soat_chiziqcha_bilan_korsatiladi(self) -> None:
         kontekst = dastur_kontekst(self.variant)
         self.assertEqual(kontekst["hours"]["coursework"], "-")
+        self.assertEqual(kontekst["hours"]["seminar"], "-")
+        self.assertEqual(kontekst["seminars"], [])
+
+    def test_seminar_soat_kontekstga_kiradi(self) -> None:
+        self.variant.seminar_soat = 8
+        self.variant.save(update_fields=["seminar_soat"])
+        kontekst = dastur_kontekst(self.variant)
+        self.assertEqual(kontekst["hours"]["seminar"], "8")
+        self.assertEqual(len(kontekst["seminars"]), 4)
+        self.assertEqual(kontekst["seminars"][0].code, "S1")
 
     def test_mustaqil_talim_hisoblanadi(self) -> None:
         kontekst = dastur_kontekst(self.variant)
@@ -270,26 +280,71 @@ class DasturSoatUstunlariTest(TestCase):
         return "\n".join(cell.text for row in jadval.rows for cell in row.cells)
 
     def test_barcha_soat_turlari_mavjud_bolsa_hech_narsa_ochirilmaydi(self) -> None:
+        self.variant.seminar_soat = 8
+        self.variant.save(update_fields=["seminar_soat"])
         jadval = self._jadval1(self.variant)
         matn = self._jadval_matni(jadval)
-        for kutilgan in ("Ma’ruza", "Amaliy", "Lab-ya"):
+        for kutilgan in ("Ma’ruza", "Amaliy", "Lab-ya", "Seminar"):
             self.assertIn(kutilgan, matn)
-        self.assertEqual(len(self._grid_kengliklari(jadval)), 10)
+        self.assertEqual(len(self._grid_kengliklari(jadval)), 11)
+        # Section 1 values line up with their headers.
+        row5 = [c.text for c in jadval.rows[5].cells]
+        self.assertIn(str(self.variant.maruza_soat), row5)
+        self.assertIn(str(self.variant.amaliyot_soat), row5)
+        self.assertIn(str(self.variant.laboratoriya_soat), row5)
+        self.assertIn(str(self.variant.seminar_soat), row5)
+        # Section 5 carries all four sub-headers, in order.
+        for kutilgan in (
+            "Ma’ruza (M)",
+            "Amaliy mashg‘ulot (A)",
+            "Laboratoriya mashg‘ulot (L)",
+            "Seminar (S)",
+        ):
+            self.assertIn(kutilgan, matn)
 
     def test_laboratoriyasiz_fan_ustuni_va_sarlavhasi_ochiriladi(self) -> None:
+        # Factory default seminar_soat is 0, so this drops both Lab-ya and
+        # Seminar (2 of the 4 hour columns) -- 11 grid cols down to 9.
         self.variant.laboratoriya_soat = 0
         self.variant.save(update_fields=["laboratoriya_soat"])
         jadval = self._jadval1(self.variant)
         matn = self._jadval_matni(jadval)
         self.assertNotIn("Lab-ya", matn)
         self.assertNotIn("Laboratoriya mashg‘ulot (L)", matn)
+        self.assertNotIn("Seminar", matn)
         self.assertIn("Ma’ruza", matn)
         self.assertIn("Amaliy", matn)
         kengliklar = self._grid_kengliklari(jadval)
         self.assertEqual(len(kengliklar), 9)
         self.assertEqual(sum(kengliklar), 9961)
 
-    def test_bitta_soat_turi_qolganda_ikkitasi_ochiriladi(self) -> None:
+    def test_seminarli_labsiz_fan_ustunlari_togri_ochiriladi(self) -> None:
+        """The bug report: InkT.GP 1805 with maruza=32, amaliy=8, seminar=8,
+        laboratoriya=0 — everything except Seminar rendered."""
+        self.variant.maruza_soat = 32
+        self.variant.amaliyot_soat = 8
+        self.variant.laboratoriya_soat = 0
+        self.variant.seminar_soat = 8
+        self.variant.save(
+            update_fields=[
+                "maruza_soat",
+                "amaliyot_soat",
+                "laboratoriya_soat",
+                "seminar_soat",
+            ]
+        )
+        jadval = self._jadval1(self.variant)
+        matn = self._jadval_matni(jadval)
+        for kutilgan in ("Ma’ruza", "Amaliy", "Seminar"):
+            self.assertIn(kutilgan, matn)
+        self.assertNotIn("Lab-ya", matn)
+        self.assertNotIn("Laboratoriya mashg‘ulot (L)", matn)
+        self.assertIn("Seminar (S)", matn)
+        kengliklar = self._grid_kengliklari(jadval)
+        self.assertEqual(len(kengliklar), 10)
+        self.assertEqual(sum(kengliklar), 9961)
+
+    def test_bitta_soat_turi_qolganda_uchtasi_ochiriladi(self) -> None:
         self.variant.amaliyot_soat = 0
         self.variant.laboratoriya_soat = 0
         self.variant.save(update_fields=["amaliyot_soat", "laboratoriya_soat"])
@@ -298,6 +353,7 @@ class DasturSoatUstunlariTest(TestCase):
         self.assertIn("Ma’ruza", matn)
         self.assertNotIn("Amaliy", matn)
         self.assertNotIn("Lab-ya", matn)
+        self.assertNotIn("Seminar", matn)
         self.assertEqual(sum(self._grid_kengliklari(jadval)), 9961)
 
     def test_barcha_soatlar_nol_bolsa_ustunlar_saqlanadi(self) -> None:
@@ -309,7 +365,7 @@ class DasturSoatUstunlariTest(TestCase):
         )
         jadval = self._jadval1(self.variant)
         matn = self._jadval_matni(jadval)
-        self.assertEqual(len(self._grid_kengliklari(jadval)), 10)
+        self.assertEqual(len(self._grid_kengliklari(jadval)), 11)
         for kutilgan in ("Ma’ruza", "Amaliy", "Lab-ya"):
             self.assertIn(kutilgan, matn)
 
