@@ -74,4 +74,4 @@ def _muqova_yili(semestrlar: list[FanSemestr]) -> int:
 
 def _universitet_nomi() -> str:
     universitet = Universitet.objects.first()
-    return universitet.rasmiy_nomi if universitet else ""
+    return universitet.rasmiy_nomi if universitet else "Turan International University"

@@ -128,6 +128,11 @@ class DasturKontekstTest(TestCase):
         self.assertEqual(kontekst["semesters_str"], "1")
         self.assertEqual(kontekst["credits_str"], str(self.fs.kredit))
 
+    def test_universitet_qatori_yoq_bolsa_standart_nom_ishlatiladi(self) -> None:
+        Universitet.objects.all().delete()
+        kontekst = dastur_kontekst(self.variant)
+        self.assertEqual(kontekst["university"], "Turan International University")
+
     def test_nol_soat_chiziqcha_bilan_korsatiladi(self) -> None:
         kontekst = dastur_kontekst(self.variant)
         self.assertEqual(kontekst["hours"]["seminar"], "-")
