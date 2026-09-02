@@ -1,5 +1,5 @@
-"""Drops the Table 1 hour columns (Ma'ruza / Amaliy / Lab-ya) and section-5
-sub-headers for hour types a course has no hours for.
+"""Drops the Table 1 hour columns (Ma'ruza / Amaliy / Lab-ya / Seminar) and
+section-5 sub-headers for hour types a course has no hours for.
 
 docxtpl substitutes tags but cannot remove table columns or rows outside a
 {%tr %} loop, so both are cut out of the rendered document's OOXML instead.
@@ -14,13 +14,14 @@ from plans.models import FanVariant
 
 JADVAL_INDEKSI = 1
 JADVAL_SONI = 3
-GRID_USTUNLARI = 10
+GRID_USTUNLARI = 11
 
 # Grid column index in Table 1 -> the FanVariant field holding its hours.
 SOAT_USTUNLARI: tuple[tuple[int, str], ...] = (
     (4, "maruza_soat"),
     (5, "amaliyot_soat"),
     (6, "laboratoriya_soat"),
+    (7, "seminar_soat"),
 )
 
 # Section-5 sub-header row labels, paired with the same fields, in table order.
@@ -28,6 +29,7 @@ SOAT_SARLAVHALARI: tuple[tuple[str, str], ...] = (
     ("Ma’ruza (M)", "maruza_soat"),
     ("Amaliy mashg‘ulot (A)", "amaliyot_soat"),
     ("Laboratoriya mashg‘ulot (L)", "laboratoriya_soat"),
+    ("Seminar (S)", "seminar_soat"),
 )
 
 

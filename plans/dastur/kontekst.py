@@ -51,6 +51,7 @@ def dastur_kontekst(variant: FanVariant) -> dict[str, object]:
             "lecture": _soat_matni(variant.maruza_soat),
             "practice": _soat_matni(variant.amaliyot_soat),
             "lab": _soat_matni(variant.laboratoriya_soat),
+            "seminar": _soat_matni(variant.seminar_soat),
             "self_study": _soat_matni(mustaqil_soat),
             "coursework": _soat_matni(variant.kurs_ishi_soat),
         },
@@ -64,6 +65,7 @@ def dastur_kontekst(variant: FanVariant) -> dict[str, object]:
         "lectures": bosh_mavzular(variant.maruza_soat, "M"),
         "practicals": bosh_mavzular(variant.amaliyot_soat, "A"),
         "labs": bosh_mavzular(variant.laboratoriya_soat, "L"),
+        "seminars": bosh_mavzular(variant.seminar_soat, "S"),
         "self_study_tasks": bosh_mavzular(
             mustaqil_soat, "", soat_mavzuda=SOAT_MUSTAQIL_TOPSHIRIQDA
         ),
