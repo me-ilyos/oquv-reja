@@ -3,10 +3,17 @@
 from django.utils import timezone
 
 from accounts.models import Universitet
-from plans.dastur.mavzular import bosh_mavzular
+from plans.dastur.mavzular import SOAT_MUSTAQIL_TOPSHIRIQDA, Natija, bosh_mavzular
 from plans.models import FanSemestr, FanVariant
 
 BLANK = "_____"
+
+# No model field records the language of instruction or the city; every
+# curriculum the platform handles is taught in Uzbek from Namangan.
+TALIM_TILI = "O‘zbek"
+SHAHAR = "Namangan"
+
+TN_SONI = 8
 
 
 def dastur_kontekst(variant: FanVariant) -> dict[str, object]:
@@ -17,12 +24,14 @@ def dastur_kontekst(variant: FanVariant) -> dict[str, object]:
 
     return {
         "university": _universitet_nomi(),
+        "city": SHAHAR,
+        "language": TALIM_TILI,
         "kafedra": variant.kafedra.nomi if variant.kafedra else "",
         "kafedra_council": {"year": BLANK, "date": BLANK},
         "major": {
-            "bilim_sohasi": _soha(reja.bilim_sohasi_kodi, reja.bilim_sohasi_nomi),
-            "talim_sohasi": _soha(reja.talim_sohasi_kodi, reja.talim_sohasi_nomi),
-            "talim_yonalishi": _soha(reja.yonalish_kodi, reja.yonalish_nomi),
+            "bilim_sohasi": _kod_bilan(reja.bilim_sohasi_kodi, reja.bilim_sohasi_nomi),
+            "talim_sohasi": _kod_bilan(reja.talim_sohasi_kodi, reja.talim_sohasi_nomi),
+            "talim_yonalishi": _kod_bilan(reja.yonalish_kodi, reja.yonalish_nomi),
         },
         "education_form": reja.talim_shakli.lower(),
         "year": _muqova_yili(semestrlar),
@@ -35,26 +44,36 @@ def dastur_kontekst(variant: FanVariant) -> dict[str, object]:
         "semesters_str": ", ".join(str(fs.semestr) for fs in semestrlar),
         "credits_str": ", ".join(str(fs.kredit) for fs in semestrlar),
         "weekly_hours_str": ", ".join(str(fs.haftalik_soat) for fs in semestrlar),
-        "plan_number": f"{reja.yonalish_kodi}-{fan.raqam}",
+        "plan_number": _kod_bilan(reja.yonalish_kodi, fan.raqam),
         "total_hours": _soat_matni(fan.jami_soat or 0),
         "classroom_total": _soat_matni(variant.auditoriya_soat),
         "hours": {
             "lecture": _soat_matni(variant.maruza_soat),
             "practice": _soat_matni(variant.amaliyot_soat),
             "lab": _soat_matni(variant.laboratoriya_soat),
-            "seminar": _soat_matni(variant.seminar_soat),
             "self_study": _soat_matni(mustaqil_soat),
             "coursework": _soat_matni(variant.kurs_ishi_soat),
+        },
+        "purpose": "",
+        "tasks": "",
+        "prerequisites": ["", "", ""],
+        "outcomes": {
+            "professional": [Natija(f"TN{i}", "") for i in range(1, TN_SONI + 1)],
+            "skills": [Natija(f"TN{i}", "") for i in range(1, TN_SONI + 1)],
         },
         "lectures": bosh_mavzular(variant.maruza_soat, "M"),
         "practicals": bosh_mavzular(variant.amaliyot_soat, "A"),
         "labs": bosh_mavzular(variant.laboratoriya_soat, "L"),
-        "seminars": bosh_mavzular(variant.seminar_soat, "S"),
+        "self_study_tasks": bosh_mavzular(
+            mustaqil_soat, "", soat_mavzuda=SOAT_MUSTAQIL_TOPSHIRIQDA
+        ),
     }
 
 
-def _soha(kodi: str, nomi: str) -> str:
-    return f"{kodi} – {nomi}" if kodi else nomi
+def _kod_bilan(kodi: str, matn: str) -> str:
+    """Official documents join a classifier code to its name with a spaced
+    en-dash — used for both the soha/yonalish lines and the plan number."""
+    return f"{kodi} – {matn}" if kodi else matn
 
 
 def _soat_matni(soat: int) -> str:
