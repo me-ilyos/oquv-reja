@@ -11,6 +11,7 @@ from docxtpl import DocxTemplate
 
 from accounts.models import OqituvchiProfil
 from plans.dastur.kontekst import dastur_kontekst
+from plans.dastur.soat_ustunlari import soat_ustunlarini_tozala
 from plans.models import FanVariant, SoatTuri, Yuklama
 
 SABLON_YOLI = Path(__file__).resolve().parent / "oquv_dastur.docx"
@@ -32,6 +33,9 @@ def dastur_egasimi(variant: FanVariant, oqituvchi: OqituvchiProfil) -> bool:
 def dastur_render(variant: FanVariant) -> BytesIO:
     hujjat = DocxTemplate(SABLON_YOLI)
     hujjat.render(dastur_kontekst(variant))
+    # `.docx` and not `.get_docx()`: the latter reloads the template from disk
+    # after a render, silently discarding everything just rendered.
+    soat_ustunlarini_tozala(hujjat.docx, variant)
     buffer = BytesIO()
     hujjat.save(buffer)
     buffer.seek(0)
