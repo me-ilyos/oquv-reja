@@ -33,6 +33,16 @@ In the DOCX XML, the body contains:
 
 ## 2. Cover Page (Paragraphs)
 
+The cover page is sourced **verbatim** from the reference file
+`sources/Kiberxavfsizlik_asoslari_fan_dasturi_ATDT.docx` — loaded with
+python-docx, trimmed to just the cover-page paragraphs + the 1-row approval
+box, then specific runs are swapped for Jinja tags (see
+`plans/dastur/build_template.py`'s `_load_cover_page` / `_insert_cover_page_tags`).
+It is no longer generated from scratch by python-docx calls. Because the page
+setup (`sectPr`) also comes from that source file, **the page size is US
+Letter** (12240×15840 twips), not A4 — Table 1 and Table 2, generated
+separately, are unaffected by this.
+
 These are standalone paragraphs before the main table. The platform pre-fills all of them.
 
 | Order | Content | Pre-fill source | Example |

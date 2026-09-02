@@ -291,14 +291,3 @@ AXBOROT_MANBALARI = [
     ("2", "www.pedagogika.uz", "http://www.pedagogika.uz"),
     ("3", "www.ziyonet.uz  ", "http://www.ziyonet.uz"),
 ]
-
-TASDIQLAYMAN_BOX = (
-    "“TASDIQLAYMAN”\n"
-    "Turan International University\n"
-    "O‘quv departament direktori\n"
-    "________ Q.Inoyatov\n"
-    "2026-yil “___” _________\n"
-    "\n"
-    "Ro‘yxatga olindi:__________\n"
-    "2026-yil “_____” __________"
-)

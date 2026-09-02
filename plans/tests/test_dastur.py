@@ -1,6 +1,5 @@
 from django.test import TestCase
 from docx.oxml.ns import qn
-from docx.shared import Mm
 
 from accounts.models import Department, Universitet
 from plans import dashboard
@@ -176,6 +175,17 @@ class DasturKontekstTest(TestCase):
         self.assertIn("M1", matn)
         self.assertIn(f"M{self.variant.maruza_soat // 2}", matn)
 
+    def test_muqova_teglari_toldiriladi(self) -> None:
+        from docx import Document
+
+        buffer = dastur_render(self.variant)
+        hujjat = Document(buffer)
+        muqova_matni = "\n".join(p.text for p in hujjat.paragraphs)
+        self.assertNotRegex(muqova_matni, r"\{\{|\{%tr")
+        self.assertIn(self.variant.nomi.upper(), muqova_matni)
+        self.assertIn("600000 – Aniq fanlar", muqova_matni)
+        self.assertIn(str(self.yil), muqova_matni)
+
 
 class DasturFormatlashTest(TestCase):
     """Uses the raw template (plans.dastur.service.SABLON_YOLI), not a
@@ -189,10 +199,10 @@ class DasturFormatlashTest(TestCase):
 
         self.hujjat = Document(SABLON_YOLI)
 
-    def test_sahifa_olchami_a4(self) -> None:
+    def test_sahifa_olchami_letter(self) -> None:
         bolim = self.hujjat.sections[0]
-        self.assertEqual(bolim.page_width.twips, Mm(210).twips)
-        self.assertEqual(bolim.page_height.twips, Mm(297).twips)
+        self.assertEqual(bolim.page_width.twips, 12240)
+        self.assertEqual(bolim.page_height.twips, 15840)
 
     def test_shrift_times_new_roman(self) -> None:
         normal = self.hujjat.styles["Normal"]

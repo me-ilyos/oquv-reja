@@ -1,5 +1,12 @@
 # Rebuild the O'quv Dastur DOCX template
 
+> **Superseded (cover page only):** the cover page is no longer generated
+> from scratch by this rebuild's python-docx code. See
+> `docs/dastur_cover_page_from_source_plan.md` — the cover page is now
+> loaded verbatim from `sources/Kiberxavfsizlik_asoslari_fan_dasturi_ATDT.docx`,
+> which reverts the cover page (only) to Letter page size. Table 1/Table 2
+> below are unaffected and still built the way this doc describes.
+
 ## Context
 
 Teachers report that the generated O'quv Dastur (course syllabus) document has formatting that's "a bit off." Investigation found the generation pipeline itself (`plans/dastur/service.py`, `kontekst.py`, `mavzular.py`) is correct and already covered by tests — the bug lives entirely in the Jinja template file `plans/dastur/oquv_dastur.docx`, which `docxtpl` renders. That file was exported from Google Docs rather than authored natively in Word (`docProps/core.xml` shows `creator="Un-named"`, all-zero RSIDs, a `GrammarlyDocumentId` property). This export left it with real, verifiable defects:

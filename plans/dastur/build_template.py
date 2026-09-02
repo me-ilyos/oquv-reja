@@ -10,26 +10,21 @@ from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Cm, Mm, Pt
+from docx.shared import Pt
+from docx.text.paragraph import Paragraph
 from docxtpl import DocxTemplate
 
 from plans.dastur.table1_spec import TABLE1_COL_WIDTHS, table1_rows
 from plans.dastur.table2_spec import TABLE2_COL_WIDTHS, table2_rows
-from plans.dastur.table_helpers import (
-    CellSpec,
-    RowSpec,
-    _add_hyperlink,
-    build_table_from_spec,
-)
-from plans.dastur.template_text import (
-    AXBOROT_MANBALARI,
-    IZOH,
-    TASDIQLAYMAN_BOX,
-)
+from plans.dastur.table_helpers import _add_hyperlink, build_table_from_spec
+from plans.dastur.template_text import AXBOROT_MANBALARI, IZOH
 
 OUTPUT_PATH = Path(__file__).resolve().parent / "oquv_dastur.docx"
-
-TABLE0_COL_WIDTHS = [5495, 4081]
+SOURCE_TEMPLATE_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "sources"
+    / "Kiberxavfsizlik_asoslari_fan_dasturi_ATDT.docx"
+)
 
 EXPECTED_TOP_LEVEL_VARS = {
     "university",
@@ -54,16 +49,6 @@ EXPECTED_TOP_LEVEL_VARS = {
 }
 
 
-def _set_page_setup(document: Document) -> None:
-    section = document.sections[0]
-    section.page_width = Mm(210)
-    section.page_height = Mm(297)
-    section.top_margin = Cm(2)
-    section.bottom_margin = Cm(2.5)
-    section.left_margin = Cm(2)
-    section.right_margin = Cm(2)
-
-
 def _set_rfonts(font, name: str) -> None:
     font.name = name
     rpr = font.element.get_or_add_rPr()
@@ -81,109 +66,124 @@ def _register_styles(document: Document) -> None:
     _set_rfonts(normal.font, "Times New Roman")
     normal.paragraph_format.line_spacing = 1.0
 
-    styles = document.styles
-    centered = styles.add_style("DasturCentered", WD_STYLE_TYPE.PARAGRAPH)
-    centered.base_style = normal
-    centered.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    heading = styles.add_style("DasturHeading", WD_STYLE_TYPE.PARAGRAPH)
-    heading.base_style = normal
-    heading.font.bold = True
-    heading.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    italic = styles.add_style("DasturItalic", WD_STYLE_TYPE.PARAGRAPH)
-    italic.base_style = normal
-    italic.font.italic = True
-
-    justify = styles.add_style("DasturJustify", WD_STYLE_TYPE.PARAGRAPH)
+    justify = document.styles.add_style("DasturJustify", WD_STYLE_TYPE.PARAGRAPH)
     justify.base_style = normal
     justify.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
 
-def _add_run_paragraph(
-    document: Document, runs: list[tuple[str, bool]], *, align, style=None
-):
-    """Adds a paragraph made of (text, bold) run pairs — used for cover-page
-    lines that mix a bold label with a plain Jinja tag in one paragraph."""
-    paragraph = document.add_paragraph(style=style)
-    paragraph.alignment = align
-    for text, bold in runs:
-        run = paragraph.add_run(text)
-        run.bold = bold
-    return paragraph
-
-
-def _add_bold_line(document: Document, text: str) -> None:
-    paragraph = document.add_paragraph()
-    run = paragraph.add_run(text)
-    run.bold = True
-
-
-def _build_approval_table(document: Document) -> None:
-    rows = [RowSpec([CellSpec(""), CellSpec(TASDIQLAYMAN_BOX, align="left")])]
-    build_table_from_spec(document, rows, TABLE0_COL_WIDTHS)
-
-
-def _build_cover_page_title(document: Document) -> None:
-    document.add_paragraph("TURAN INTERNATIONAL UNIVERSITY", style="DasturHeading")
-    document.add_paragraph()
-    _build_approval_table(document)
-    document.add_paragraph()
-    document.add_paragraph()
-
-    _add_run_paragraph(
-        document,
-        [("{{ course.name|upper }}", True)],
-        align=WD_ALIGN_PARAGRAPH.CENTER,
+def _load_cover_page(path: Path) -> Document:
+    """Loads the reference source .docx and trims its body down to just the
+    cover page (title paragraphs + the 1-row approval box), dropping the
+    98-row main table and everything after it but keeping the trailing
+    sectPr, which carries the page setup (Letter, per the source)."""
+    document = Document(path)
+    body = document.element.body
+    children = list(body)
+    main_table_idx = next(
+        i
+        for i, el in enumerate(children)
+        if el.tag == qn("w:tbl") and len(el.findall(qn("w:tr"))) > 5
     )
-    document.add_paragraph("FANINING O‘QUV DASTURI", style="DasturHeading")
-    _add_run_paragraph(
-        document,
-        [("({{ education_form }} ta'lim uchun)", True)],
-        align=WD_ALIGN_PARAGRAPH.CENTER,
-        style="DasturItalic",
-    )
-    document.add_paragraph(style="DasturCentered")
+    for el in children[main_table_idx:]:
+        if el.tag != qn("w:sectPr"):
+            body.remove(el)
+    return document
 
 
-def _build_cover_page_major_and_signoff(document: Document) -> None:
-    _add_run_paragraph(
-        document,
-        [("Bilim sohasi:", True), ("  {{ major.bilim_sohasi }}", False)],
-        align=WD_ALIGN_PARAGRAPH.JUSTIFY,
-    )
-    _add_run_paragraph(
-        document,
-        [("Ta’lim sohasi:", True), ("  {{ major.talim_sohasi }}", False)],
-        align=WD_ALIGN_PARAGRAPH.JUSTIFY,
-    )
-    _add_run_paragraph(
-        document,
-        [("Ta’lim yo‘nalishi:", True), ("  {{ major.talim_yonalishi }}", False)],
-        align=WD_ALIGN_PARAGRAPH.JUSTIFY,
-    )
-    for _ in range(5):
-        document.add_paragraph(style="DasturCentered")
-
-    _add_run_paragraph(
-        document, [("Namangan – {{ year }}", True)], align=WD_ALIGN_PARAGRAPH.CENTER
-    )
-    document.add_paragraph(
-        "Mazkur o‘quv dasturi {{ university }} {{ kafedra }} kafedrasi tomonidan "
-        "taqdim etilgan (kafedraning {{ kafedra_council.year }}-yil"
-        "{{ kafedra_council.date }}-sonli yig‘ilish bayoni).",
-        style="DasturJustify",
-    )
-    _add_bold_line(document, "Tuzuvchi:")
-    document.add_paragraph()
-    _add_bold_line(document, "Taqrizchilar:")
-    document.add_paragraph()
-    document.add_paragraph()
+def _find_paragraph(document: Document, needle: str) -> Paragraph:
+    matches = [p for p in document.paragraphs if needle in p.text]
+    if not matches:
+        raise ValueError(f"Could not find a paragraph containing {needle!r}")
+    if len(matches) > 1:
+        raise ValueError(
+            f"Paragraph text {needle!r} is ambiguous ({len(matches)} hits)"
+        )
+    return matches[0]
 
 
-def _build_cover_page(document: Document) -> None:
-    _build_cover_page_title(document)
-    _build_cover_page_major_and_signoff(document)
+def _replace_run_text(paragraph: Paragraph, old: str, new: str) -> None:
+    """Replaces `old` with `new` in the single run that contains it,
+    preserving that run's formatting. Raises if no single run holds it, so a
+    reference-doc wording change can never silently ship a dead label
+    instead of a working Jinja tag."""
+    for run in paragraph.runs:
+        if old in run.text:
+            run.text = run.text.replace(old, new)
+            return
+    raise ValueError(f"Could not find {old!r} in a single run of {paragraph.text!r}")
+
+
+def _consolidate_tag(
+    paragraph: Paragraph, start_marker: str, end_marker: str, tag: str
+) -> None:
+    """Handles the one value Word's autocorrect split across several runs
+    (Ta'lim yo'nalishi): puts `tag` whole into the run where `start_marker`
+    begins and blanks every run up to and including the one holding
+    `end_marker`, so the tag ends up living in exactly one non-empty run —
+    required, since docxtpl's tag parser breaks on a tag split across runs.
+    """
+    runs = paragraph.runs
+    start_idx = next(i for i, r in enumerate(runs) if start_marker in r.text)
+    end_idx = next(i for i in range(start_idx, len(runs)) if end_marker in runs[i].text)
+    prefix = runs[start_idx].text[: runs[start_idx].text.index(start_marker)]
+    end_text = runs[end_idx].text
+    suffix = end_text[end_text.index(end_marker) + len(end_marker) :]
+    if start_idx == end_idx:
+        runs[start_idx].text = prefix + tag + suffix
+        return
+    runs[start_idx].text = prefix + tag
+    runs[end_idx].text = suffix
+    for i in range(start_idx + 1, end_idx):
+        runs[i].text = ""
+
+
+def _blank_paragraph_after(document: Document, label_text: str) -> None:
+    """Clears the reference doc's real author/reviewer name that follows a
+    'Tuzuvchi:'/'Taqrizchilar:' label paragraph — kontekst.py has no
+    author/reviewer fields, so these stay blank fill-ins as before."""
+    paragraphs = document.paragraphs
+    idx = next(i for i, p in enumerate(paragraphs) if p.text == label_text)
+    for run in paragraphs[idx + 1].runs:
+        run.text = ""
+
+
+def _insert_cover_page_tags(document: Document) -> None:
+    _replace_run_text(
+        _find_paragraph(document, "KIBERXAVFSIZLIK ASOSLARI"),
+        "KIBERXAVFSIZLIK ASOSLARI",
+        "{{ course.name|upper }}",
+    )
+    _replace_run_text(
+        _find_paragraph(document, "kunduzgi"), "kunduzgi", "{{ education_form }}"
+    )
+    _replace_run_text(
+        _find_paragraph(document, "Bilim sohasi:"),
+        "600000 – Axborot-kommunikatsiya texnologiyalari",
+        "{{ major.bilim_sohasi }}",
+    )
+    _replace_run_text(
+        _find_paragraph(document, "Ta’lim sohasi:"),
+        "610000 – Axborot-kommunikatsiya texnologiyalari",
+        "{{ major.talim_sohasi }}",
+    )
+    _consolidate_tag(
+        _find_paragraph(document, "Ta’lim yo‘nalishi:"),
+        "60610",
+        "minoti",
+        "{{ major.talim_yonalishi }}",
+    )
+    _replace_run_text(
+        _find_paragraph(document, "Namangan – 2026"), "2026", "{{ year }}"
+    )
+
+    mazkur = _find_paragraph(document, "Mazkur o‘quv dasturi")
+    _replace_run_text(mazkur, "Turan International University", "{{ university }}")
+    _replace_run_text(mazkur, "Filologiya", "{{ kafedra }}")
+    _replace_run_text(mazkur, "2026-yil", "{{ kafedra_council.year }}-yil")
+    _replace_run_text(mazkur, "_" * 19, "{{ kafedra_council.date }}")
+
+    _blank_paragraph_after(document, "Tuzuvchi:")
+    _blank_paragraph_after(document, "Taqrizchilar:")
 
 
 def _apply_reference_hyperlinks(table) -> None:
@@ -244,10 +244,9 @@ def _check_template_variables(path: Path) -> None:
 
 
 def build() -> Document:
-    document = Document()
-    _set_page_setup(document)
+    document = _load_cover_page(SOURCE_TEMPLATE_PATH)
     _register_styles(document)
-    _build_cover_page(document)
+    _insert_cover_page_tags(document)
     build_table_from_spec(document, table1_rows(), TABLE1_COL_WIDTHS)
     _build_footer_table(document)
     _add_trailing_paragraphs(document)
