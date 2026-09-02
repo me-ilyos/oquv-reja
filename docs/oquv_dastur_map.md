@@ -4,6 +4,14 @@ Structural reference for generating and pre-filling the O'quv Dastur `.docx` doc
 
 The platform **generates** this document with course metadata pre-filled. Teachers fill in the content sections (topics, descriptions, references). This map defines what to pre-fill and what to leave empty.
 
+`plans/dastur/oquv_dastur.docx` is a hand-editable Word file, not code-generated. It was produced once by `scripts/make_dastur_template.py`, which opens
+`sources/Kiberxavfsizlik_asoslari_fan_dasturi_ATDT.docx` (a real, fully populated dastur) read-only, swaps concrete values for docxtpl Jinja tags, and
+collapses repeating rows into `{%tr for %}` loops — keeping every border, merge, and font byte-for-byte. Re-run that script only if the university
+reissues the reference form; otherwise edit `plans/dastur/oquv_dastur.docx` directly in Word (reword a heading, adjust a border) the same way any other
+document is edited. At runtime, `plans/dastur/service.py::dastur_render()` renders that template via `docxtpl.DocxTemplate`, using the context built by
+`plans/dastur/kontekst.py::dastur_kontekst()`, then `plans/dastur/soat_ustunlari.py::soat_ustunlarini_tozala()` cuts out the hour columns and section-5
+sub-headers a course has no hours for (docxtpl can't remove a table column, so this is post-render OOXML surgery — see §3 and §9 below).
+
 ---
 
 ## 1. Document Structure Overview
@@ -33,15 +41,11 @@ In the DOCX XML, the body contains:
 
 ## 2. Cover Page (Paragraphs)
 
-The cover page is sourced **verbatim** from the reference file
-`sources/Kiberxavfsizlik_asoslari_fan_dasturi_ATDT.docx` — loaded with
-python-docx, trimmed to just the cover-page paragraphs + the 1-row approval
-box, then specific runs are swapped for Jinja tags (see
-`plans/dastur/build_template.py`'s `_load_cover_page` / `_insert_cover_page_tags`).
-It is no longer generated from scratch by python-docx calls. Because the page
-setup (`sectPr`) also comes from that source file, **the page size is US
-Letter** (12240×15840 twips), not A4 — Table 1 and Table 2, generated
-separately, are unaffected by this.
+The whole document — cover page included — is the reference file itself,
+edited in place by `scripts/make_dastur_template.py`. Nothing is trimmed or
+reloaded from a separate source at build time, so the page setup, fonts, and
+borders are exactly the reference document's: **US Letter** (12240×15840
+twips), not A4.
 
 These are standalone paragraphs before the main table. The platform pre-fills all of them.
 
@@ -94,8 +98,8 @@ Row 5:  (empty, span=3)    │ {total_hrs}      │{lec_hrs}│{pra_hr}│{lab_h
 | R1.C2 | Semestr | O'quv Reja → semester number(s) | e.g., `7`. If multi-semester, comma-separated. |
 | R1.C3 | ECTS - Kreditlar | O'quv Reja → credits for this semester | Per-semester credits, not total. |
 | R2.C0 | Fan/modul turi | Derived from section | `Majburiy` or `Tanlov` |
-| R2.C1 | Ta'lim tili | Config / hardcoded | `O'zbek` (could be configurable) |
-| R2.C2 | O'quv rejadagi tartib raqami | O'quv Reja → major code + order number | e.g., `60610100 – 1.19` |
+| R2.C1 | Ta'lim tili | Hardcoded | `O'zbek`, from `TALIM_TILI` in `plans/dastur/kontekst.py` — no model field records the language of instruction |
+| R2.C2 | O'quv rejadagi tartib raqami | O'quv Reja → major code + order number | e.g., `60610100 – 1.19`, joined by `_kod_bilan()` (spaced en-dash), same helper as the soha/yonalish cover-page lines |
 | R2.C3 | Haftadagi dars soatlari | O'quv Reja → weekly hours for this semester | e.g., `6` |
 | R3.C0 | Fanning nomi | O'quv Reja → course title | Spans 3 grid columns, merged vertically with R4–R5 |
 | R3.C1 | Jami yuklama (soat) | Label only | Value goes in R5 |
@@ -108,7 +112,7 @@ Row 5:  (empty, span=3)    │ {total_hrs}      │{lec_hrs}│{pra_hr}│{lab_h
 | R5.C5 | Independent study hours | O'quv Reja → mustaqil ta'lim | e.g., `108` |
 | R5.C6 | Course project | O'quv Reja → kurs ishi | `-` if none, `Kurs ishi` if present |
 
-> **Note on Seminar:** the hour-type sub-headers (Row 4) show only the types that apply. This example has Ma'ruza, Amaliy, Lab-ya (no Seminar). If a course has Seminar hours instead of Lab, the column should say `Seminar`. The columns are dynamic based on which hour types are non-zero.
+> **Note on the hour columns:** the reference document — and therefore the template — has exactly three hour-type columns: `Ma'ruza`, `Amaliy`, `Lab-ya`. There is no Seminar column. A column is dropped entirely (not just shown as `-`) when that hour type is zero, implemented as post-render OOXML surgery in `plans/dastur/soat_ustunlari.py::soat_ustunlarini_tozala()`, since docxtpl can only substitute tags, not remove table columns. The freed width is spread evenly across the surviving hour columns so the table stays full width. If all three are zero, nothing is deleted — removing all three would leave the "Auditoriya" header cell spanning zero grid columns, which is invalid OOXML.
 
 ---
 
@@ -148,22 +152,22 @@ Row M+2:  "A2"  |  {empty}                                 |  2
 Row L+0:  ""    |  "Laboratoriya mashg'ulot (L)"           |  {total_lab_hours}
 Row L+1:  "L1"  |  {empty}                                 |  2
   ...           (one row per lesson: total = lab_hours / 2)
-
-[Seminar section if applicable, same pattern with "S1", "S2", ...]
 ```
 
 ### Pre-fill rules:
 
 | What | Value | Source |
 |---|---|---|
-| Sub-section headers | `Ma'ruza (M)`, `Amaliy mashg'ulot (A)`, `Laboratoriya mashg'ulot (L)`, `Seminar (S)` | Hardcoded labels |
+| Sub-section headers | `Ma'ruza (M)`, `Amaliy mashg'ulot (A)`, `Laboratoriya mashg'ulot (L)` | Static text, already in the template |
 | Total hours per sub-section | The number in the last column of the header row | O'quv Reja |
-| Number of lesson rows | `hours / 2` per type | Computed |
+| Number of lesson rows | `hours / 2` per type | Computed by `bosh_mavzular()` |
 | Row labels | `M1`, `M2`, ..., `A1`, `A2`, ..., `L1`, `L2`, ... | Sequential |
 | Hours per lesson | Always `2` | Hardcoded |
 | Topic/description cell | **Empty** | Teacher fills |
 
-**Only include sub-sections for hour types that have non-zero hours.** If a course has no lab hours, omit the Laboratoriya section entirely.
+**Only include sub-sections for hour types that have non-zero hours.** If a course has no lab hours, `soat_ustunlarini_tozala()` removes the
+Laboratoriya sub-header row entirely at render time — it sits outside its `{%tr for%}` loop, so an empty `labs` list alone would leave the header
+behind with a bare `-`.
 
 ---
 
@@ -250,10 +254,9 @@ The document structure adapts to the course:
 
 | Condition | Effect |
 |---|---|
-| No lecture hours | Omit `Ma'ruza (M)` sub-section in Section 5 |
-| No practice hours | Omit `Amaliy mashg'ulot (A)` sub-section |
-| No lab hours | Omit `Laboratoriya mashg'ulot (L)` sub-section |
-| No seminar hours | Omit `Seminar (S)` sub-section |
+| No lecture hours | Section 1's Ma'ruza column and Section 5's `Ma'ruza (M)` sub-header row are both removed |
+| No practice hours | Section 1's Amaliy column and Section 5's `Amaliy mashg'ulot (A)` sub-header row are both removed |
+| No lab hours | Section 1's Lab-ya column and Section 5's `Laboratoriya mashg'ulot (L)` sub-header row are both removed |
+| All three hour types zero | Nothing is removed — deleting all three would leave the "Auditoriya" header cell spanning zero grid columns |
 | No course project | Row 5 last cell = `-` instead of `Kurs ishi` |
 | Multi-semester course | Comma-separated semesters and years in Section 1 |
-| Seminar label in hour table | Use `Seminar` column header instead of `Lab-ya` (Row 4 adapts) |
