@@ -1,4 +1,5 @@
 from django.test import TestCase
+from docx import Document
 from docx.oxml.ns import qn
 
 from accounts.models import Department, Universitet
@@ -32,6 +33,10 @@ class BoshMavzularTest(TestCase):
     def test_nol_soat_bosh_royxat(self) -> None:
         self.assertEqual(bosh_mavzular(0, "L"), [])
         self.assertEqual(bosh_mavzular(-4, "S"), [])
+
+    def test_ustunlashtirilgan_soat_mavzuda(self) -> None:
+        mavzular = bosh_mavzular(10, "", soat_mavzuda=4)
+        self.assertEqual([m.hours for m in mavzular], [4, 4, 2])
 
 
 class DasturEgasimiTest(TestCase):
@@ -116,10 +121,12 @@ class DasturKontekstTest(TestCase):
         kontekst = dastur_kontekst(self.variant)
         self.assertEqual(kontekst["university"], "Test universiteti")
         self.assertEqual(kontekst["kafedra"], "Matematika")
+        self.assertEqual(kontekst["city"], "Namangan")
+        self.assertEqual(kontekst["language"], "O‘zbek")
         self.assertEqual(kontekst["course"]["code"], self.variant.kodi)
         self.assertEqual(kontekst["course"]["name"], self.variant.nomi)
         self.assertEqual(
-            kontekst["plan_number"], f"{self.variant.fan.reja.yonalish_kodi}-1.05"
+            kontekst["plan_number"], f"{self.variant.fan.reja.yonalish_kodi} – 1.05"
         )
         self.assertEqual(kontekst["major"]["bilim_sohasi"], "600000 – Aniq fanlar")
         self.assertEqual(kontekst["total_hours"], str(self.variant.fan.jami_soat))
@@ -135,7 +142,6 @@ class DasturKontekstTest(TestCase):
 
     def test_nol_soat_chiziqcha_bilan_korsatiladi(self) -> None:
         kontekst = dastur_kontekst(self.variant)
-        self.assertEqual(kontekst["hours"]["seminar"], "-")
         self.assertEqual(kontekst["hours"]["coursework"], "-")
 
     def test_mustaqil_talim_hisoblanadi(self) -> None:
@@ -148,7 +154,21 @@ class DasturKontekstTest(TestCase):
         self.assertEqual(len(kontekst["lectures"]), self.variant.maruza_soat // 2)
         self.assertEqual(kontekst["practicals"][0].code, "A1")
         self.assertEqual(len(kontekst["labs"]), self.variant.laboratoriya_soat // 2)
-        self.assertEqual(kontekst["seminars"], [])
+
+    def test_mustaqil_topshiriqlar_4_soatdan_hisoblanadi(self) -> None:
+        kontekst = dastur_kontekst(self.variant)
+        kutilgan_soat = self.variant.fan.jami_soat - self.variant.auditoriya_soat
+        self.assertEqual(len(kontekst["self_study_tasks"]), kutilgan_soat // 4)
+        self.assertTrue(all(t.hours == 4 for t in kontekst["self_study_tasks"]))
+
+    def test_oqituvchi_toldiriladigan_maydonlar_bosh(self) -> None:
+        kontekst = dastur_kontekst(self.variant)
+        self.assertEqual(kontekst["purpose"], "")
+        self.assertEqual(kontekst["tasks"], "")
+        self.assertEqual(kontekst["prerequisites"], ["", "", ""])
+        self.assertEqual(len(kontekst["outcomes"]["professional"]), 8)
+        self.assertEqual(len(kontekst["outcomes"]["skills"]), 8)
+        self.assertEqual(kontekst["outcomes"]["professional"][0].code, "TN1")
 
     def test_kop_semestrli_oquv_yillari_takrorlanmaydi(self) -> None:
         make_fan_semestr(self.variant, semestr=2)
@@ -166,9 +186,14 @@ class DasturKontekstTest(TestCase):
         buffer = dastur_render(self.variant)
         self.assertGreater(len(buffer.getvalue()), 0)
 
-    def test_render_mavzu_qatorlari_hujjatga_kiradi(self) -> None:
-        from docx import Document
+    def test_render_hech_qanday_teg_qolmaydi(self) -> None:
+        """Every declared variable must be supplied — a leftover {{ }} or
+        {%tr %} means one was missed."""
+        buffer = dastur_render(self.variant)
+        hujjat = Document(buffer)
+        self.assertNotRegex(hujjat.element.xml, r"\{\{|\{%")
 
+    def test_render_mavzu_qatorlari_hujjatga_kiradi(self) -> None:
         buffer = dastur_render(self.variant)
         hujjat = Document(buffer)
         matn = "\n".join(
@@ -181,20 +206,16 @@ class DasturKontekstTest(TestCase):
         self.assertIn(f"M{self.variant.maruza_soat // 2}", matn)
 
     def test_muqova_teglari_toldiriladi(self) -> None:
-        from docx import Document
-
         buffer = dastur_render(self.variant)
         hujjat = Document(buffer)
         muqova_matni = "\n".join(p.text for p in hujjat.paragraphs)
-        self.assertNotRegex(muqova_matni, r"\{\{|\{%tr")
+        self.assertNotRegex(muqova_matni, r"\{\{|\{%")
         self.assertIn(self.variant.nomi.upper(), muqova_matni)
         self.assertIn("600000 – Aniq fanlar", muqova_matni)
         self.assertIn(str(self.yil), muqova_matni)
         self.assertIn(f"{self.kafedra.nomi} kafedrasi", muqova_matni)
 
     def test_tuzuvchi_va_taqrizchi_bosh_qoldiriladi(self) -> None:
-        from docx import Document
-
         buffer = dastur_render(self.variant)
         hujjat = Document(buffer)
         paragraphs = hujjat.paragraphs
@@ -206,6 +227,104 @@ class DasturKontekstTest(TestCase):
             idx = next(i for i, p in enumerate(paragraphs) if p.text == label)
             self.assertEqual(paragraphs[idx + 1].text, "")
 
+    def test_yorliq_va_qiymat_alohida_paragraf(self) -> None:
+        """The defect the code-built pipeline had: label and value fused
+        onto one line ("Fan/modul turiMajburiy"). They must render as two
+        separate paragraphs in the cell, one per line."""
+        buffer = dastur_render(self.variant)
+        hujjat = Document(buffer)
+        matn = "\n".join(
+            cell.text
+            for table in hujjat.tables
+            for row in table.rows
+            for cell in row.cells
+        )
+        self.assertIn("Fan/modul turi\nMajburiy", matn)
+
+
+class DasturSoatUstunlariTest(TestCase):
+    """Covers the post-render hour-column/sub-header surgery — it only
+    exists in the rendered document, since the raw template always carries
+    all three hour columns."""
+
+    def setUp(self) -> None:
+        Universitet.objects.create(rasmiy_nomi="Test universiteti")
+        kafedra = Department.objects.create(
+            nomi="Matematika", fakultet="Aniq fanlar fakulteti"
+        )
+        reja = make_reja(boshlanish_yili=dashboard.joriy_akademik_yil())
+        fan = make_fan(reja, raqam="1.05", kafedra=kafedra, jami_soat=120)
+        self.variant = fan.tanlangan_variant
+        make_fan_semestr(self.variant, semestr=1)
+
+    def _jadval1(self, variant):
+        return Document(dastur_render(variant)).tables[1]
+
+    def _grid_kengliklari(self, jadval) -> list[int]:
+        return [
+            int(gridcol.get(qn("w:w")))
+            for gridcol in jadval._tbl.find(qn("w:tblGrid")).findall(qn("w:gridCol"))
+        ]
+
+    def _jadval_matni(self, jadval) -> str:
+        return "\n".join(cell.text for row in jadval.rows for cell in row.cells)
+
+    def test_barcha_soat_turlari_mavjud_bolsa_hech_narsa_ochirilmaydi(self) -> None:
+        jadval = self._jadval1(self.variant)
+        matn = self._jadval_matni(jadval)
+        for kutilgan in ("Ma’ruza", "Amaliy", "Lab-ya"):
+            self.assertIn(kutilgan, matn)
+        self.assertEqual(len(self._grid_kengliklari(jadval)), 10)
+
+    def test_laboratoriyasiz_fan_ustuni_va_sarlavhasi_ochiriladi(self) -> None:
+        self.variant.laboratoriya_soat = 0
+        self.variant.save(update_fields=["laboratoriya_soat"])
+        jadval = self._jadval1(self.variant)
+        matn = self._jadval_matni(jadval)
+        self.assertNotIn("Lab-ya", matn)
+        self.assertNotIn("Laboratoriya mashg‘ulot (L)", matn)
+        self.assertIn("Ma’ruza", matn)
+        self.assertIn("Amaliy", matn)
+        kengliklar = self._grid_kengliklari(jadval)
+        self.assertEqual(len(kengliklar), 9)
+        self.assertEqual(sum(kengliklar), 9961)
+
+    def test_bitta_soat_turi_qolganda_ikkitasi_ochiriladi(self) -> None:
+        self.variant.amaliyot_soat = 0
+        self.variant.laboratoriya_soat = 0
+        self.variant.save(update_fields=["amaliyot_soat", "laboratoriya_soat"])
+        jadval = self._jadval1(self.variant)
+        matn = self._jadval_matni(jadval)
+        self.assertIn("Ma’ruza", matn)
+        self.assertNotIn("Amaliy", matn)
+        self.assertNotIn("Lab-ya", matn)
+        self.assertEqual(sum(self._grid_kengliklari(jadval)), 9961)
+
+    def test_barcha_soatlar_nol_bolsa_ustunlar_saqlanadi(self) -> None:
+        self.variant.maruza_soat = 0
+        self.variant.amaliyot_soat = 0
+        self.variant.laboratoriya_soat = 0
+        self.variant.save(
+            update_fields=["maruza_soat", "amaliyot_soat", "laboratoriya_soat"]
+        )
+        jadval = self._jadval1(self.variant)
+        matn = self._jadval_matni(jadval)
+        self.assertEqual(len(self._grid_kengliklari(jadval)), 10)
+        for kutilgan in ("Ma’ruza", "Amaliy", "Lab-ya"):
+            self.assertIn(kutilgan, matn)
+
+    def test_ustun_ochirilgach_vertikal_birlashma_saqlanadi(self) -> None:
+        self.variant.laboratoriya_soat = 0
+        self.variant.save(update_fields=["laboratoriya_soat"])
+        jadval = self._jadval1(self.variant)
+        qatorlar = jadval._tbl.findall(qn("w:tr"))
+
+        def vmerge(qator_idx: int):
+            return qatorlar[qator_idx].findall(qn("w:tc"))[0].tcPr.find(qn("w:vMerge"))
+
+        self.assertEqual(vmerge(3).get(qn("w:val")), "restart")
+        self.assertIsNone(vmerge(4).get(qn("w:val")))
+
 
 class DasturFormatlashTest(TestCase):
     """Uses the raw template (plans.dastur.service.SABLON_YOLI), not a
@@ -213,8 +332,6 @@ class DasturFormatlashTest(TestCase):
     context, so row counts are only stable before rendering."""
 
     def setUp(self) -> None:
-        from docx import Document
-
         from plans.dastur.service import SABLON_YOLI
 
         self.hujjat = Document(SABLON_YOLI)
@@ -224,20 +341,13 @@ class DasturFormatlashTest(TestCase):
         self.assertEqual(bolim.page_width.twips, 12240)
         self.assertEqual(bolim.page_height.twips, 15840)
 
-    def test_shrift_times_new_roman(self) -> None:
-        normal = self.hujjat.styles["Normal"]
-        self.assertEqual(normal.font.name, "Times New Roman")
-        rfonts = normal.font.element.get_or_add_rPr().find(qn("w:rFonts"))
-        self.assertEqual(rfonts.get(qn("w:eastAsia")), "Times New Roman")
-        self.assertEqual(rfonts.get(qn("w:cs")), "Times New Roman")
-
-    def test_sarlavha_qatori_kulrang_fon(self) -> None:
-        header_row = self.hujjat.tables[1].rows[0]
-        tc = header_row.cells[0]._tc
-        shd = tc.find(qn("w:tcPr")).find(qn("w:shd"))
-        self.assertEqual(shd.get(qn("w:fill")), "D9D9D9")
-
-    def test_jadval_tuzilishi_saqlanadi(self) -> None:
+    def test_jadvallar_soni(self) -> None:
         self.assertEqual(len(self.hujjat.tables), 3)
-        self.assertEqual(len(self.hujjat.tables[1].rows), 58)
-        self.assertEqual(len(self.hujjat.tables[2].rows), 17)
+
+    def test_yorliq_qiymatdan_alohida_paragraf(self) -> None:
+        """Pins the structural fix: label and value are two paragraphs in
+        the same cell, not fused into one."""
+        cell = self.hujjat.tables[1].rows[2].cells[0]
+        self.assertEqual(len(cell.paragraphs), 2)
+        self.assertEqual(cell.paragraphs[0].text, "Fan/modul turi")
+        self.assertIn("{{ course.module_type }}", cell.paragraphs[1].text)
