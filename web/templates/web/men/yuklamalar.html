@@ -77,6 +77,21 @@
         <td data-label="">
           {% if yuklama.tur == "MARUZA" %}
           <a class="btn" href="{% url 'men:dastur' yuklama.fan_semestr.variant_id %}">Dasturni yaratish</a>
+          {% with topshirish=yuklama.fan_semestr.variant.dastur_topshirish %}
+          {% if topshirish.holat == "QABUL_QILINDI" %}
+          <div><span class="tag tag-mand">QABUL QILINDI</span></div>
+          {% elif topshirish.holat == "RAD_ETILDI" %}
+          <div><span class="tag tag-rad">RAD ETILDI</span></div>
+          {% if topshirish.izoh %}<div class="credits">{{ topshirish.izoh }}</div>{% endif %}
+          {% elif topshirish.holat == "KUTILMOQDA" %}
+          <div><span class="tag tag-elec">KO'RIB CHIQILMOQDA</span></div>
+          {% endif %}
+          <form method="post" action="{% url 'men:dastur_topshirish' yuklama.fan_semestr.variant_id %}" enctype="multipart/form-data" style="margin-top:6px;">
+            {% csrf_token %}
+            <input type="file" name="fayl" accept=".docx" required style="font-size:11px;max-width:150px;">
+            <button type="submit" class="btn">Topshirish</button>
+          </form>
+          {% endwith %}
           {% endif %}
         </td>
       </tr>

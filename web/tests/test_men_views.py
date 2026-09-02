@@ -1,9 +1,10 @@
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import Rol
 from plans.dashboard import joriy_akademik_yil
-from plans.models import SoatTuri, Yuklama
+from plans.models import DasturTopshirish, SoatTuri, Yuklama
 from plans.services import oqituvchi_yillik_yuklamasi
 from plans.tests.factories import (
     make_fan,
@@ -120,3 +121,38 @@ class MenOquvDasturTests(TestCase):
         login(self.client, mudir)
         javob = self.client.get(reverse("men:dastur", args=[variant.pk]))
         self.assertEqual(javob.status_code, 200)
+
+
+class MenDasturTopshirishTests(TestCase):
+    def setUp(self) -> None:
+        self.joriy = joriy_akademik_yil()
+        self.maruza_egasi = make_oqituvchi()
+        reja = make_reja(boshlanish_yili=self.joriy)
+        fan = make_fan(reja, kafedra=self.maruza_egasi.kafedra)
+        self.variant = fan.tanlangan_variant
+        fs = make_fan_semestr(self.variant, semestr=1)
+        Yuklama.objects.create(
+            fan_semestr=fs, tur=SoatTuri.MARUZA, oqituvchi=self.maruza_egasi
+        )
+        self.url = reverse("men:dastur_topshirish", args=[self.variant.pk])
+
+    def test_begona_oqituvchi_rad_etiladi(self) -> None:
+        begona = make_oqituvchi(kafedra=self.maruza_egasi.kafedra)
+        login(self.client, begona.foydalanuvchi)
+        javob = self.client.post(
+            self.url, {"fayl": SimpleUploadedFile("d.docx", b"mazmun")}
+        )
+        self.assertEqual(javob.status_code, 403)
+
+    def test_egasi_topshiradi(self) -> None:
+        login(self.client, self.maruza_egasi.foydalanuvchi)
+        javob = self.client.post(
+            self.url, {"fayl": SimpleUploadedFile("d.docx", b"mazmun")}
+        )
+        self.assertRedirects(javob, reverse("men:yuklamalar"))
+        self.assertTrue(DasturTopshirish.objects.filter(variant=self.variant).exists())
+
+    def test_notogri_kengaytma_rad_etiladi(self) -> None:
+        login(self.client, self.maruza_egasi.foydalanuvchi)
+        self.client.post(self.url, {"fayl": SimpleUploadedFile("d.txt", b"mazmun")})
+        self.assertFalse(DasturTopshirish.objects.filter(variant=self.variant).exists())

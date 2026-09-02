@@ -80,6 +80,7 @@ thead .col-code, thead .col-name { background: #eef0f4; z-index: 4; }
 .tag { font-size: 10.5px; padding: 2px 6px; border-radius: 3px; font-weight: 600; letter-spacing: 0.02em; }
 .tag-mand { background: var(--mand-soft); color: var(--mand); }
 .tag-elec { background: var(--elec-soft); color: var(--elec); }
+.tag-rad { background: var(--unassigned-soft); color: var(--unassigned); }
 
 .credits { font-size: 12px; color: var(--muted); }
 
