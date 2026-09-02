@@ -48,6 +48,14 @@ CYRILLIC_LOOKALIKES = str.maketrans(
     }
 )
 
+EDU_TYPE_CANONICAL = {
+    "kunduzgi": "Kunduzgi",
+    "kechki": "Kechki",
+    "kechgi": "Kechki",
+    "sirtqi": "Sirtqi",
+    "sirtki": "Sirtqi",
+}
+
 WEEKLY_GROUP_LABELS = ("haftalar soni", "kurslardagi haftalar")
 CREDIT_GROUP_LABELS = ("kredit",)
 SKIP_ROW_LABELS = (
@@ -77,6 +85,17 @@ def _normalize_text(value: str) -> str:
     across the glyph variants and keyboard-layout slips seen in `sources/`."""
     value = APOSTROPHE_RE.sub("'", value).translate(CYRILLIC_LOOKALIKES)
     return value.casefold()
+
+
+def _normalize_edu_type(raw: str) -> str | None:
+    """Match a ta'lim shakli value to its canonical form (Kunduzgi/Kechki/
+    Sirtqi) by substring containment, so trailing text like '(4 yil)' doesn't
+    block the match. Returns None when nothing matches."""
+    norm = _normalize_text(raw).strip()
+    for needle, canonical in EDU_TYPE_CANONICAL.items():
+        if needle in norm:
+            return canonical
+    return None
 
 
 def _normalize_section_marker(value) -> str | None:
@@ -153,14 +172,19 @@ def read_metadata(ws, warnings: list[str]) -> tuple[str, str, str]:
     text after the label's separator or '' when its cell is absent."""
     degree_cell = find_cell_containing(ws, "Akademik daraja")
     duration_cell = find_cell_containing(ws, "muddati")
-    edu_type_cell = find_cell_containing(ws, "shakli")
+    edu_type_cell = find_cell_containing(ws, "ta'lim shakli")
     degree = value_after_dash(degree_cell.value) if degree_cell else ""
     duration = value_after_dash(duration_cell.value) if duration_cell else ""
-    edu_type = value_after_dash(edu_type_cell.value) if edu_type_cell else ""
     if not degree:
         warnings.append("akademik daraja topilmadi")
-    if not edu_type:
+    if edu_type_cell is None:
         warnings.append("ta'lim shakli topilmadi")
+        return degree, duration, ""
+    raw_edu_type = value_after_dash(edu_type_cell.value)
+    edu_type = _normalize_edu_type(raw_edu_type)
+    if edu_type is None:
+        warnings.append(f"ta'lim shakli tanilmadi: {raw_edu_type!r}")
+        return degree, duration, ""
     return degree, duration, edu_type
 
 

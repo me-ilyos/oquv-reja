@@ -38,46 +38,47 @@ def _standard_layout(
         (2, 1): direction,
         (3, 1): f"O'qish muddati - {duration}",
         (4, 1): "Akademik daraja - BAKALAVR",
+        (4, 2): "O'qish shakli - Kredit-modul",
         (5, 1): "Ta'lim shakli - kunduzgi",
         (6, 1): f"{year} o'quv yili",
-        (7, 1): "II. O'QUV REJASI",
-        (8, 4): "Umumiy yuklama",
-        (8, 5): "Auditoriya",
-        (8, 11): "Semestrdagi haftalar soni",
-        (8, 19): "Semestrdagi kreditlar taqsimoti",
-        (9, 6): "Ma'ruza",
-        (9, 7): "Amaliy",
-        (9, 8): "Laboratoriya",
-        (9, 9): "Seminar",
-        (9, 10): "Kurs ishi",
-        (10, 1): "1.00",
-        (10, 3): "Majburiy fanlar",
-        (11, 1): "1.01",
-        (11, 2): "COD1",
-        (11, 3): "Course A",
-        (11, 4): 120,
-        (11, 5): 60,
-        (11, 6): 30,
-        (11, 7): 30,
-        (12, 1): "2.00",
-        (12, 3): "Tanlov fanlar",
-        (13, 1): "2.01",
-        (13, 2): "SEL1",
-        (13, 3): "Selective A",
-        (13, 4): 90,
-        (13, 5): 45,
-        (13, 6): 45,
-        (14, 2): "SEL2",
-        (14, 3): "Selective B",
-        (15, 3): "Jami:",
+        (17, 1): "II. O'QUV REJASI",
+        (18, 4): "Umumiy yuklama",
+        (18, 5): "Auditoriya",
+        (18, 11): "Semestrdagi haftalar soni",
+        (18, 19): "Semestrdagi kreditlar taqsimoti",
+        (19, 6): "Ma'ruza",
+        (19, 7): "Amaliy",
+        (19, 8): "Laboratoriya",
+        (19, 9): "Seminar",
+        (19, 10): "Kurs ishi",
+        (20, 1): "1.00",
+        (20, 3): "Majburiy fanlar",
+        (21, 1): "1.01",
+        (21, 2): "COD1",
+        (21, 3): "Course A",
+        (21, 4): 120,
+        (21, 5): 60,
+        (21, 6): 30,
+        (21, 7): 30,
+        (22, 1): "2.00",
+        (22, 3): "Tanlov fanlar",
+        (23, 1): "2.01",
+        (23, 2): "SEL1",
+        (23, 3): "Selective A",
+        (23, 4): 90,
+        (23, 5): 45,
+        (23, 6): 45,
+        (24, 2): "SEL2",
+        (24, 3): "Selective B",
+        (25, 3): "Jami:",
     }
     for i in range(n):
-        rows[(9, 11 + i)] = i + 1
-        rows[(9, 19 + i)] = i + 1
-    rows[(11, 11)] = 4  # course: semester 1 weekly hours
-    rows[(11, 19)] = 4  # course: semester 1 credits
-    rows[(13, 13)] = 3  # selective slot: semester 3 weekly hours
-    rows[(13, 21)] = 3  # selective slot: semester 3 credits
+        rows[(19, 11 + i)] = i + 1
+        rows[(19, 19 + i)] = i + 1
+    rows[(21, 11)] = 4  # course: semester 1 weekly hours
+    rows[(21, 19)] = 4  # course: semester 1 credits
+    rows[(23, 13)] = 3  # selective slot: semester 3 weekly hours
+    rows[(23, 21)] = 3  # selective slot: semester 3 credits
     return rows
 
 
@@ -96,6 +97,7 @@ class ParseWorkbookHappyPathTest(SimpleTestCase):
         self.assertEqual(result.direction_name, "Boshlang'ich ta'lim")
         self.assertEqual(result.start_year, "2024")
         self.assertEqual(result.duration_years, 4)
+        self.assertEqual(result.edu_type, "Kunduzgi")
         self.assertEqual(len(result.core), 1)
         self.assertEqual(result.core[0].semester_credits, {1: 4})
         self.assertEqual(len(result.slots), 1)
@@ -155,11 +157,42 @@ class ParseWorkbookHappyPathTest(SimpleTestCase):
         rows = _standard_layout(
             8, "Ta'lim yo'nalishi: 60110500 - Boshlang'ich ta'lim", "4 yil", "2024-2025"
         )
-        rows[(11, 19)] = "1,5"
+        rows[(21, 19)] = "1,5"
         path = _write_workbook(rows)
         result = parse_workbook(path)
         self.assertEqual(result.core[0].semester_credits, {1: 2})
         self.assertTrue(any("1,5" in w for w in result.warnings))
+
+    def test_talim_shakli_oqish_shakli_bilan_adashmaydi(self) -> None:
+        rows = _standard_layout(
+            8, "Ta'lim yo'nalishi: 60110500 - Boshlang'ich ta'lim", "4 yil", "2024-2025"
+        )
+        path = _write_workbook(rows)
+        result = parse_workbook(path)
+        self.assertEqual(result.edu_type, "Kunduzgi")
+
+    def test_talim_shakli_apostrof_variantlari(self) -> None:
+        for label in ("Ta’lim shakli - kunduzgi", "Ta‘lim shakli - kunduzgi"):
+            rows = _standard_layout(
+                8,
+                "Ta'lim yo'nalishi: 60110500 - Boshlang'ich ta'lim",
+                "4 yil",
+                "2024-2025",
+            )
+            rows[(5, 1)] = label
+            path = _write_workbook(rows)
+            result = parse_workbook(path)
+            self.assertEqual(result.edu_type, "Kunduzgi")
+
+    def test_notanish_talim_shakli_ogohlantiradi(self) -> None:
+        rows = _standard_layout(
+            8, "Ta'lim yo'nalishi: 60110500 - Boshlang'ich ta'lim", "4 yil", "2024-2025"
+        )
+        rows[(5, 1)] = "Ta'lim shakli - masofaviy"
+        path = _write_workbook(rows)
+        result = parse_workbook(path)
+        self.assertEqual(result.edu_type, "")
+        self.assertTrue(any("ta'lim shakli tanilmadi" in w for w in result.warnings))
 
     def test_kurs_loyihasi_ishi_yorlig_topiladi(self) -> None:
         rows = _standard_layout(
@@ -168,8 +201,8 @@ class ParseWorkbookHappyPathTest(SimpleTestCase):
             "4 yil",
             "2024-2025",
         )
-        rows[(9, 10)] = "Kurs loyihasi (ishi)"
-        rows[(11, 10)] = 20
+        rows[(19, 10)] = "Kurs loyihasi (ishi)"
+        rows[(21, 10)] = 20
         path = _write_workbook(rows)
         result = parse_workbook(path)
         self.assertEqual(result.core[0].course_proj, 20)
@@ -190,12 +223,12 @@ class ParseWorkbookHappyPathTest(SimpleTestCase):
         rows = _standard_layout(
             8, "Ta'lim yo'nalishi: 60110500 - Boshlang'ich ta'lim", "4 yil", "2024-2025"
         )
-        del rows[(8, 11)]
-        del rows[(8, 19)]
+        del rows[(18, 11)]
+        del rows[(18, 19)]
         # Logical column numbers: weekly = 12..19, credit = 20..27 (offset 11).
         for i in range(8):
-            rows[(9, 11 + i)] = 12 + i
-            rows[(9, 19 + i)] = 20 + i
+            rows[(19, 11 + i)] = 12 + i
+            rows[(19, 19 + i)] = 20 + i
         path = _write_workbook(rows)
         result = parse_workbook(path)
         self.assertEqual(len(result.core), 1)
@@ -231,7 +264,7 @@ class ParseWorkbookFailurePathTest(SimpleTestCase):
         )
         for key in list(rows):
             row, col = key
-            if row in (8, 9) and col >= 11:
+            if row in (18, 19) and col >= 11:
                 del rows[key]
         path = _write_workbook(rows)
         with self.assertRaises(ParseError):
