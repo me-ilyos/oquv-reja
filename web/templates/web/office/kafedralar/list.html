@@ -2,6 +2,7 @@
 {% load ui %}
 {% block title %}Kafedralar{% endblock %}
 {% block content %}
+<div id="office-kafedralar-jonli">
 <div class="topbar">
   <div>
     <div class="title">Kafedralar</div>
@@ -9,89 +10,309 @@
   <div class="controls">
     {% if yillar %}
     <form method="get">
-      <select name="yil" onchange="this.form.submit()">
-        {% for y in yillar %}
-        <option value="{{ y }}" {% if y == yil %}selected{% endif %}>{{ y }}/{{ y|add:1 }} o'quv yili</option>
-        {% endfor %}
-      </select>
+      {% url 'office:kafedra_list' as kaf_url %}
+      {% include "web/parts/_yil_tanlov.html" with hx_url=kaf_url hx_target="#office-kafedralar-jonli" %}
     </form>
     {% endif %}
-    <a class="btn btn-primary" href="{% url 'office:kafedra_yangi' %}">+ Yangi kafedra</a>
+    <a class="btn" href="{% url 'office:oqituvchi_shakl1_zip' %}?yil={{ yil }}" hx-boost="false">1-shakl ZIP (.zip)</a>
+    <a class="btn btn-primary" href="{% url 'office:kafedra_yangi' %}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span>Yangi kafedra</span>
+    </a>
   </div>
 </div>
-<div x-data="{ qidiruv: '' }">
-  <div class="controls" style="margin-bottom:10px;">
-    <div class="search">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input type="text" placeholder="Kafedra nomi" x-model="qidiruv">
+<div x-data="{
+  qidiruv: '',
+  mosSoni() {
+    const q = this.qidiruv.toLowerCase();
+    let soni = 0;
+    this.$root.querySelectorAll('tbody#kafedralar-tbody tr[data-nomi]').forEach((tr) => {
+      if (q === '' || (tr.dataset.nomi || '').includes(q)) soni += 1;
+    });
+    return soni;
+  }
+}">
+  <div class="filter-toolbar">
+    <div class="filter-toolbar-left">
+      {% include "web/parts/_qidiruv.html" with placeholder="Kafedra yoki mudir..." aria_label="Kafedra qidirish" %}
     </div>
   </div>
-  <div class="table-wrap narrow cards">
+  <div class="table-wrap cards">
     <table>
       <thead>
         <tr>
-          <th>Kafedra</th>
-          <th>Mudir</th>
-          <th class="num">O'qituvchilar</th>
-          <th class="num">Biriktirilgan soat</th>
-          <th class="num">Taqsimlangan soat</th>
-          <th style="min-width:120px;">Qamrov</th>
-          <th></th>
+          <th style="min-width:200px;">Kafedra</th>
+          <th style="min-width:180px;">Mudir</th>
+          <th class="col-center" style="width:130px;">O'qituvchilar</th>
+          <th class="col-center" style="width:140px;">Biriktirilgan soat</th>
+          <th class="col-center" style="width:140px;">Taqsimlangan soat</th>
+          <th class="col-center" style="min-width:150px;">Qamrov</th>
+          <th class="col-center" style="width:140px;">Holat</th>
+          <th class="col-center" style="width:90px;">Amallar</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="kafedralar-tbody" data-jonli="kafedralar-tbody">
         {% for q in qamrovlar %}
-        <tr data-nomi="{{ q.kafedra.nomi|lower }}"
+        <tr data-nomi="{{ q.kafedra.nomi|lower }} {{ q.kafedra.mudir|default:''|stringformat:'s'|lower }}"
             x-show="qidiruv === '' || $el.dataset.nomi.includes(qidiruv.toLowerCase())">
-          <td data-label="Kafedra"><strong>{{ q.kafedra.nomi }}</strong></td>
-          <td data-label="Mudir" class="assign-cell cell-relative" x-data="{ ochiq: false }" @click.outside="ochiq = false">
-          {% if q.kafedra.mudir %}
-          <button type="button" class="teacher-chip" @click="ochiq = !ochiq">
-            <span class="avatar">{{ q.kafedra.mudir|stringformat:"s"|bosh_harflar }}</span>{{ q.kafedra.mudir }}
-          </button>
-          {% else %}
-          <button type="button" class="teacher-chip empty" @click="ochiq = !ochiq">+ Mudir tayinlash</button>
-          {% endif %}
-          <div class="popover" x-show="ochiq" x-cloak>
-            {% for profil in q.kafedra.oqituvchilar.all %}
-            <form method="post" action="{% url 'office:kafedra_mudir' q.kafedra.pk %}">
-              {% csrf_token %}
-              <input type="hidden" name="profil" value="{{ profil.pk }}">
-              <button type="submit" class="opt"><span class="avatar">{{ profil|stringformat:"s"|bosh_harflar }}</span>{{ profil }}</button>
-            </form>
-            {% empty %}
-            <div class="hint" style="padding:6px 8px;">Kafedrada o'qituvchi yo'q</div>
-            {% endfor %}
+          <td data-label="Kafedra">
+            <button type="button" class="reja-link reja-link-btn"
+                    data-modal-title="{{ q.kafedra.nomi }} kafedrasi"
+                    data-modal-subtitle="{{ yil }}/{{ yil|add:1 }} o'quv yili yuklama ko'rsatkichlari"
+                    data-modal-edit-url="{% url 'office:kafedra_tahrir' q.kafedra.pk %}"
+                    data-row-modal="Kafedra nomi::{{ q.kafedra.nomi }}||Kafedra mudiri::{{ q.kafedra.mudir|default:'Tayinlanmagan' }}||Faol o'qituvchilar::{{ q.oqituvchilar_soni }} nafar||Biriktirilgan soat::{{ q.biriktirilgan_soat }} soat||Taqsimlangan soat::{{ q.taqsimlangan_soat }} soat||Qamrov darajasi::{{ q.taqsimlangan_soat|foiz:q.biriktirilgan_soat }}%||Tasdiq holati::{{ q.tasdiq.get_holat_display|default:'Qoralama' }}">
+              <strong>{{ q.kafedra.nomi }}</strong>
+            </button>
+          </td>
+          <td data-label="Mudir" class="assign-cell cell-relative"
+              :class="ochiq && 'popover-ochiq'"
+              x-data="jadvalPopover()"
+              @click.outside="yopish()" @keydown.escape.window="yopish()"
+              @scroll.window.capture="skrollYopish($event)" @resize.window="yopish()">
             {% if q.kafedra.mudir %}
-            <form method="post" action="{% url 'office:kafedra_mudir' q.kafedra.pk %}">
-              {% csrf_token %}
-              <input type="hidden" name="profil" value="">
-              <button type="submit" class="opt clear">Mudirni bekor qilish</button>
-            </form>
+            <button type="button" class="teacher-chip" @click="ochishYopish($el)" :aria-expanded="ochiq.toString()">
+              <span class="avatar">{{ q.kafedra.mudir|stringformat:"s"|bosh_harflar }}</span><span class="chip-label">{{ q.kafedra.mudir }}</span>
+            </button>
+            {% else %}
+            <button type="button" class="teacher-chip empty" @click="ochishYopish($el)" :aria-expanded="ochiq.toString()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>Mudir tayinlash</span>
+            </button>
             {% endif %}
+            <div class="popover popover-fixed" :class="tepagaOchil && 'popover-up'" :style="posStyle" x-ref="popoverOyna" x-show="ochiq"
+                 x-transition:enter="anim-pop-enter" x-transition:enter-start="anim-pop-start" x-transition:enter-end="anim-pop-end"
+                 x-transition:leave="anim-pop-leave" x-transition:leave-start="anim-pop-end" x-transition:leave-end="anim-pop-start"
+                 x-cloak>
+              {% with oqituvchilar=q.kafedra.oqituvchilar.all %}
+              {% if oqituvchilar %}{% include "web/parts/_popover_qidiruv.html" with placeholder="O'qituvchi qidirish" model="q" %}{% endif %}
+              <div class="popover-scroll-body" x-ref="royxat">
+                {% for profil in oqituvchilar %}
+                <form method="post" action="{% url 'office:kafedra_mudir' q.kafedra.pk %}"
+                      data-nomi="{{ profil|stringformat:'s'|lower }}"
+                      x-show="q.trim() === '' || $el.dataset.nomi.includes(q.trim().toLowerCase())">
+                  {% csrf_token %}
+                  <input type="hidden" name="yil" value="{{ yil }}">
+                  <input type="hidden" name="profil" value="{{ profil.pk }}">
+                  <button type="submit" class="opt"><span class="avatar">{{ profil|stringformat:"s"|bosh_harflar }}</span>{{ profil }}</button>
+                </form>
+                {% empty %}
+                <div class="hint popover-empty-hint">Kafedrada o'qituvchi yo'q</div>
+                {% endfor %}
+                {% if oqituvchilar %}
+                <div class="hint popover-empty-hint" x-show="q.trim() !== '' && mosSoni() === 0" x-cloak>Mos o'qituvchi topilmadi</div>
+                {% endif %}
+              </div>
+              {% endwith %}
+              {% if q.kafedra.mudir %}
+              <form method="post" action="{% url 'office:kafedra_mudir' q.kafedra.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="yil" value="{{ yil }}">
+                <input type="hidden" name="profil" value="">
+                <button type="submit" class="opt clear">Mudirni bekor qilish</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+          <td class="col-center" data-label="O'qituvchilar">
+            <span class="badge-count">{{ q.oqituvchilar_soni }}</span>
+          </td>
+          <td class="col-center" data-label="Biriktirilgan soat">
+            <span class="hour-tag">{{ q.biriktirilgan_soat }} soat</span>
+          </td>
+          <td class="col-center" data-label="Taqsimlangan soat">
+            <span class="hour-tag accent">{{ q.taqsimlangan_soat }} soat</span>
+          </td>
+          <td class="col-center" data-label="Qamrov">
+            {% with f=q.taqsimlangan_soat|foiz:q.biriktirilgan_soat %}
+            <div class="qamrov-cell">
+              <div class="progress" title="{{ f }}%"><div class="fill {% if f < 100 %}warn{% endif %}" data-width="{{ f }}"></div></div>
+              <span class="qamrov-pct">{{ f }}%</span>
+            </div>
+            {% endwith %}
+          </td>
+          <td class="col-center" data-label="Holat">
+            {% if q.tasdiq.holat == "TASDIQLANGAN" %}
+              <span class="tag tag-mand">TASDIQLANGAN</span>
+            {% elif q.tasdiq.holat == "TASDIQDA" %}
+              <span class="tag tag-elec">TASDIQDA</span>
+            {% elif q.tasdiq.holat == "QAYTARILGAN" %}
+              <span class="tag tag-rad">QAYTARILGAN</span>
+            {% else %}
+              <span class="tag tag-draft">QORALAMA</span>
+            {% endif %}
+          </td>
+          <td class="col-center" data-label="Amallar">
+            <div class="action-dropdown"
+                 :class="ochiq && 'dropdown-ochiq'"
+                 x-data="amalMenyu()"
+                 @click.outside="yopish()"
+                 @keydown.escape.window="yopish()"
+                 @scroll.window.capture="skrollYopish($event)"
+                 @resize.window="yopish()"
+                 @action-menu:yopish.window="yopish()">
+              <button type="button" class="btn-dots" :class="ochiq && 'active'" @click="ochish($el)" title="Amallar" aria-label="Amallar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="2"/>
+                  <circle cx="12" cy="12" r="2"/>
+                  <circle cx="12" cy="19" r="2"/>
+                </svg>
+              </button>
+
+              <div class="action-menu action-menu-fixed"
+                   x-ref="menyuOyna"
+                   :class="tepagaOchil && 'popover-up'"
+                   x-show="ochiq"
+                   x-transition:enter="anim-pop-enter" x-transition:enter-start="anim-pop-start" x-transition:enter-end="anim-pop-end"
+                   x-transition:leave="anim-pop-leave" x-transition:leave-start="anim-pop-end" x-transition:leave-end="anim-pop-start"
+                   x-cloak
+                   :style="'top:' + pos.top + '; left:' + pos.left + ';'">
+                <button type="button" class="action-item" @click="ochiq = false"
+                        data-modal-title="{{ q.kafedra.nomi }} kafedrasi"
+                        data-modal-subtitle="{{ yil }}/{{ yil|add:1 }} o'quv yili yuklama ko'rsatkichlari"
+                        data-modal-edit-url="{% url 'office:kafedra_tahrir' q.kafedra.pk %}"
+                        data-row-modal="Kafedra nomi::{{ q.kafedra.nomi }}||Kafedra mudiri::{{ q.kafedra.mudir|default:'Tayinlanmagan' }}||Faol o'qituvchilar::{{ q.oqituvchilar_soni }} nafar||Biriktirilgan soat::{{ q.biriktirilgan_soat }} soat||Taqsimlangan soat::{{ q.taqsimlangan_soat }} soat||Qamrov darajasi::{{ q.taqsimlangan_soat|foiz:q.biriktirilgan_soat }}%||Tasdiq holati::{{ q.tasdiq.get_holat_display|default:'Qoralama' }}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                  </svg>
+                  <div class="action-text">
+                    <span class="action-title">Ma'lumot</span>
+                  </div>
+                </button>
+                <div class="action-divider"></div>
+                {% if q.tasdiq.holat == "TASDIQDA" %}
+                  <form method="post" action="{% url 'office:kafedra_tasdiqlash' q.kafedra.pk %}"
+                        data-modal-title="Yuklamani tasdiqlash"
+                        data-modal-subtitle="{{ q.kafedra.nomi }} — {{ yil }}/{{ yil|add:1 }}"
+                        data-modal-confirm="{{ q.kafedra.nomi }} kafedrasining o'quv yuklamasini tasdiqlaysizmi?"
+                        data-modal-meta="Biriktirilgan::{{ q.biriktirilgan_soat }} soat||Taqsimlangan::{{ q.taqsimlangan_soat }} soat||Qamrov::{{ q.taqsimlangan_soat|foiz:q.biriktirilgan_soat }}%"
+                        data-modal-type="success"
+                        data-modal-btn="Tasdiqlash">
+                    {% csrf_token %}
+                    <input type="hidden" name="yil" value="{{ yil }}">
+                    <button type="submit" class="action-item action-item-success" @click="ochiq = false">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                      </svg>
+                      <div class="action-text">
+                        <span class="action-title">Tasdiqlash</span>
+                      </div>
+                    </button>
+                  </form>
+                  <form method="post" action="{% url 'office:kafedra_qaytarish' q.kafedra.pk %}"
+                        data-modal-title="Yuklamani qaytarish"
+                        data-modal-subtitle="{{ q.kafedra.nomi }} — {{ yil }}/{{ yil|add:1 }}"
+                        data-modal-confirm="Kafedra yuklamasini tuzatish uchun mudirga qaytarasizmi?"
+                        data-modal-type="warning"
+                        data-modal-prompt="Qaytarish sababi"
+                        data-modal-placeholder="Kamchiliklarni ko'rsating..."
+                        data-modal-field="izoh"
+                        data-modal-required="true"
+                        data-modal-btn="Qaytarish">
+                    {% csrf_token %}
+                    <input type="hidden" name="yil" value="{{ yil }}">
+                    <input type="hidden" name="izoh" value="">
+                    <button type="submit" class="action-item" @click="ochiq = false">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 14 4 9 9 4"/>
+                        <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
+                      </svg>
+                      <div class="action-text">
+                        <span class="action-title">Qaytarish</span>
+                      </div>
+                    </button>
+                  </form>
+                  <div class="action-divider"></div>
+                {% elif q.tasdiq.holat == "TASDIQLANGAN" %}
+                  <form method="post" action="{% url 'office:kafedra_qaytarish' q.kafedra.pk %}"
+                        data-modal-title="Yuklama qulfini ochish"
+                        data-modal-subtitle="{{ q.kafedra.nomi }} — {{ yil }}/{{ yil|add:1 }}"
+                        data-modal-confirm="Tasdiqlangan yuklama qulfini ochib, qayta tahrirlashga ruxsat berasizmi?"
+                        data-modal-type="warning"
+                        data-modal-prompt="Qulfni ochish sababi"
+                        data-modal-placeholder="Qayta tahrirlash sababini kiriting..."
+                        data-modal-field="izoh"
+                        data-modal-required="true"
+                        data-modal-btn="Qulfni ochish">
+                    {% csrf_token %}
+                    <input type="hidden" name="yil" value="{{ yil }}">
+                    <input type="hidden" name="izoh" value="">
+                    <button type="submit" class="action-item" @click="ochiq = false">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+                      </svg>
+                      <div class="action-text">
+                        <span class="action-title">Qulfni ochish</span>
+                      </div>
+                    </button>
+                  </form>
+                  <div class="action-divider"></div>
+                {% endif %}
+
+                <a class="action-item" href="{% url 'office:kafedra_tahrir' q.kafedra.pk %}" @click="ochiq = false">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  <div class="action-text">
+                    <span class="action-title">Tahrirlash</span>
+                  </div>
+                </a>
+
+                <form method="post" action="{% url 'office:kafedra_ochirish' q.kafedra.pk %}"
+                      data-modal-title="Kafedrani o'chirish"
+                      data-modal-subtitle="{{ q.kafedra.nomi }}"
+                      data-modal-confirm="{{ q.kafedra.nomi }} kafedrasini tizimdan o'chirasizmi?"
+                      data-modal-type="danger"
+                      data-modal-btn="Ha, o'chirish">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <button type="submit" class="action-item action-item-danger" @click="ochiq = false">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                    <div class="action-text">
+                      <span class="action-title">O'chirish</span>
+                    </div>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8">
+          <div class="empty-state empty-state-rich">
+            <div class="empty-state-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M3 10h18M5 10v11M19 10v11M9 10v11M15 10v11M12 3l10 7H2l10-7z"/></svg>
+            </div>
+            <h3 class="empty-state-title">Kafedralar hali yaratilmagan</h3>
+            <p class="empty-state-desc">O'qituvchilar va yuklamalarni boshqarish uchun birinchi kafedrani qo'shing.</p>
+            <a class="btn btn-primary btn-sm" href="{% url 'office:kafedra_yangi' %}">Yangi kafedra</a>
           </div>
-        </td>
-        <td class="num" data-label="O'qituvchilar">{{ q.oqituvchilar_soni }}</td>
-        <td class="num" data-label="Biriktirilgan soat">{{ q.biriktirilgan_soat }}</td>
-        <td class="num" data-label="Taqsimlangan soat">{{ q.taqsimlangan_soat }}</td>
-        <td data-label="Qamrov">
-          {% with f=q.taqsimlangan_soat|foiz:q.biriktirilgan_soat %}
-          <div class="progress" title="{{ f }}%"><div class="fill {% if f < 100 %}warn{% endif %}" style="width:{{ f }}%;"></div></div>
-          {% endwith %}
-        </td>
-        <td style="white-space:nowrap;">
-          <a class="btn" href="{% url 'office:kafedra_tahrir' q.kafedra.pk %}">Tahrirlash</a>
-          <form method="post" action="{% url 'office:kafedra_ochirish' q.kafedra.pk %}" style="display:inline" onsubmit="return confirm('{{ q.kafedra.nomi }} kafedrasini o\'chirasizmi?');">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-danger">O'chirish</button>
-          </form>
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="7"><div class="empty-state">Kafedralar hali yaratilmagan.</div></td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+      {% if qamrovlar %}
+      <tbody x-show="qidiruv !== '' && mosSoni() === 0" x-cloak>
+        <tr><td colspan="8">
+          <div class="empty-state empty-state-rich empty-state-filtered">
+            <div class="empty-state-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            </div>
+            <h3 class="empty-state-title">Qidiruv bo'yicha kafedra topilmadi</h3>
+            <p class="empty-state-desc">Qidiruv so'zini tozalab qayta urinib ko'ring.</p>
+            <button type="button" class="btn btn-sm" @click="qidiruv = ''">Qidiruvni tozalash</button>
+          </div>
+        </td></tr>
+      </tbody>
+      {% endif %}
+    </table>
   </div>
+</div>
 </div>
 {% endblock %}

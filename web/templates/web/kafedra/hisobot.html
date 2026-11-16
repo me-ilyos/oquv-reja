@@ -2,65 +2,177 @@
 {% load ui %}
 {% block title %}{{ kafedra.nomi }} — yuklama hisoboti{% endblock %}
 {% block content %}
-<div class="print-toolbar">
-  {% if yillar %}
-  <form method="get">
-    <select name="yil" onchange="this.form.submit()">
-      {% for y in yillar %}
-      <option value="{{ y }}" {% if y == yil %}selected{% endif %}>{{ y }}/{{ y|add:1 }} o'quv yili</option>
-      {% endfor %}
-    </select>
-  </form>
-  {% endif %}
-  <a class="btn" href="{% url 'kafedra:dashboard' %}">← Panel</a>
-  <button type="button" class="btn btn-primary" onclick="window.print()">Chop etish</button>
+<div id="kafedra-hisobot-jonli">
+<div class="topbar print-toolbar">
+  <div>
+    <div class="title topbar-title-flex">
+      <span>Kafedra yuklama hisoboti</span>
+      <span class="badge-major">{{ kafedra.nomi }}</span>
+    </div>
+  </div>
+  <div class="controls">
+    {% if yillar %}
+    <form method="get">
+      {% url 'kafedra:hisobot' as hisobot_url %}
+      {% include "web/parts/_yil_tanlov.html" with hx_url=hisobot_url hx_target="#kafedra-hisobot-jonli" %}
+    </form>
+    {% endif %}
+    <a class="btn" href="{% url 'kafedra:hisobot_excel' %}?yil={{ yil }}" hx-boost="false">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span>Excel (.xlsx)</span>
+    </a>
+    <a class="btn" href="{% url 'kafedra:hisobot_zip' %}?yil={{ yil }}" hx-boost="false">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span>1-shakl ZIP (.zip)</span>
+    </a>
+    <button type="button" class="btn btn-primary" onclick="window.print()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <span>Chop etish</span>
+    </button>
+  </div>
 </div>
 
-<div class="letterhead">
+<div class="stats wide stats-compact print-hide" data-jonli="hisobot-summary">
+  <div class="stat"><div class="num">{{ holatlar|length }}</div><div class="lbl">O'qituvchilar soni</div></div>
+  <div class="stat ok"><div class="num">{{ jami_yuklama }}</div><div class="lbl">Jami yuklama soat</div></div>
+  <div class="stat"><div class="num">{{ jami_min }}</div><div class="lbl">Jami minimal norma</div></div>
+  <div class="stat {% if jami_yuklama < jami_min %}warn{% else %}ok{% endif %}">
+    <div class="num">{{ jami_yuklama|foiz:jami_min }}%</div>
+    <div class="lbl">Umumiy qoplanish</div>
+  </div>
+</div>
+
+<div class="letterhead print-only">
   <h1>{{ kafedra.nomi }} kafedrasi — {{ yil }}/{{ yil|add:1 }} o'quv yili yuklama hisoboti</h1>
-  <div class="sana">Tuzilgan sana: {% now "d.m.Y" %}</div>
+  <div class="sana">Tuzilgan sana: {% now "d.m.Y" %} · O'qituvchilar: {{ holatlar|length }} ta · Jami yuklama: {{ jami_yuklama }} / {{ jami_min }} soat ({{ jami_yuklama|foiz:jami_min }}%)</div>
 </div>
 
-<div class="report-summary">
-  <span>O'qituvchilar soni: <strong>{{ holatlar|length }}</strong></span>
-  <span>Jami yuklama: <strong>{{ jami_yuklama }} soat</strong></span>
-  <span>Jami minimal norma: <strong>{{ jami_min }} soat</strong></span>
-  <span>Umumiy qoplanish: <strong>{{ jami_yuklama|foiz:jami_min }}%</strong></span>
-</div>
-
-<div class="table-wrap narrow">
-  <table>
-    <thead>
-      <tr>
-        <th>№</th>
-        <th>F.I.Sh</th>
-        <th>Lavozim</th>
-        <th>Minimal soat</th>
-        <th>Yuklama soat</th>
-        <th>Farq</th>
-        <th>Holat</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for holat in holatlar %}
-      <tr>
-        <td>{{ forloop.counter }}</td>
-        <td>{{ holat.oqituvchi }}</td>
-        <td>{{ holat.oqituvchi.turi.nomi }}</td>
-        <td>{{ holat.min_soat }}</td>
-        <td>{{ holat.jami_soat }}</td>
-        <td>{% if holat.kamomad %}−{{ holat.kamomad }}{% else %}0{% endif %}</td>
-        <td>{% if holat.kamomad %}<span class="tag" style="background:var(--unassigned-soft);color:var(--unassigned);">Kamomad {{ holat.kamomad }} soat</span>{% else %}<span class="tag tag-mand">To'ldi</span>{% endif %}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="7"><div class="empty-state">Kafedrada o'qituvchilar yo'q.</div></td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div x-data="{
+       qidiruv: '',
+       faqatKamomad: false,
+       mosSoni() {
+         const body = this.$refs.hisobotBody;
+         if (!body) return 1;
+         const q = this.qidiruv.toLowerCase();
+         let son = 0;
+         body.querySelectorAll('tr[data-nomi]').forEach((tr) => {
+           const ok = (!this.faqatKamomad || tr.dataset.kamomad === '1') && (q === '' || (tr.dataset.nomi || '').includes(q));
+           if (ok) son++;
+         });
+         return son;
+       }
+     }">
+  {% if holatlar %}
+  <div class="filter-toolbar print-hide">
+    <div class="filter-toolbar-left">
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" placeholder="O'qituvchi yoki lavozim..." aria-label="Hisobotda qidirish" x-model="qidiruv">
+        <button type="button" class="search-clear" x-show="qidiruv !== ''" x-cloak x-transition.opacity.duration.150ms @click="qidiruv = ''" aria-label="Qidiruvni tozalash" title="Tozalash">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <label class="chip-btn chip-toggle" :class="faqatKamomad && 'active'">
+        <input type="checkbox" class="chip-check-native" x-model="faqatKamomad">
+        <span class="chip-check-box" aria-hidden="true">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        <span>Faqat kamomadi borlar</span>
+      </label>
+    </div>
+  </div>
+  {% endif %}
+  <div class="table-wrap cards">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-center" style="width:50px;">№</th>
+          <th>F.I.Sh</th>
+          <th>Lavozim</th>
+          <th class="col-center" style="width:140px;">Minimal soat</th>
+          <th class="col-center" style="width:140px;">Yuklama soat</th>
+          <th class="col-center" style="width:120px;">Farq</th>
+          <th class="col-center" style="width:170px;">Holat</th>
+        </tr>
+      </thead>
+      <tbody data-jonli="hisobot-tbody" x-ref="hisobotBody">
+        {% for holat in holatlar %}
+        <tr data-nomi="{{ holat.oqituvchi|lower }} {{ holat.oqituvchi.turi.nomi|lower }}"
+            data-kamomad="{% if holat.kamomad %}1{% else %}0{% endif %}"
+            x-show="(!faqatKamomad || $el.dataset.kamomad === '1') && (qidiruv === '' || $el.dataset.nomi.includes(qidiruv.toLowerCase()))">
+          <td class="col-center col-idx-muted" data-label="№">{{ forloop.counter }}</td>
+          <td data-label="F.I.Sh">
+            <button type="button" class="reja-link reja-link-btn"
+                    data-modal-title="{{ holat.oqituvchi }}"
+                    data-modal-subtitle="{{ kafedra.nomi }} · {{ holat.oqituvchi.turi.nomi|capfirst }}"
+                    data-modal-url="{% url 'kafedra:oqituvchi_yuklama' holat.oqituvchi.pk %}?yil={{ yil }}"
+                    data-modal-url-label="1-shakl yuklama varaqasi"
+                    data-row-modal="F.I.Sh::{{ holat.oqituvchi }}||Lavozim::{{ holat.oqituvchi.turi.nomi|capfirst }}||Minimal norma::{{ holat.min_soat }} soat||Yuklama soat::{{ holat.jami_soat }} soat||Kamomad::{{ holat.kamomad }} soat||Qoplanish::{{ holat.jami_soat|foiz:holat.min_soat }}%">
+              <strong>{{ holat.oqituvchi }}</strong>
+            </button>
+          </td>
+          <td data-label="Lavozim" class="row-muted-text">{{ holat.oqituvchi.turi.nomi|capfirst }}</td>
+          <td class="col-center" data-label="Minimal soat"><span class="hisobot-norma">{{ holat.min_soat }} soat</span></td>
+          <td class="col-center" data-label="Yuklama soat"><span class="hour-tag {% if holat.jami_soat < holat.min_soat %}warn{% else %}ok{% endif %}">{{ holat.jami_soat }} soat</span></td>
+          <td class="col-center" data-label="Farq">
+            {% if holat.kamomad %}
+            <span class="hisobot-farq-warn">−{{ holat.kamomad }}</span>
+            {% else %}
+            <span class="hisobot-farq-ok">0</span>
+            {% endif %}
+          </td>
+          <td class="col-center" data-label="Holat">
+            {% if holat.kamomad %}
+            <span class="tag tag-rad">Kamomad {{ holat.kamomad }} soat</span>
+            {% else %}
+            <span class="tag tag-mand">To'ldi</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">
+          <div class="empty-state-rich">
+            <div class="empty-state-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/></svg>
+            </div>
+            <div class="empty-state-title">Kafedrada o'qituvchilar yo'q</div>
+            <div class="empty-state-desc">Hisobot uchun kafedraga o'qituvchi qo'shing.</div>
+            <a class="btn btn-primary btn-sm" href="{% url 'kafedra:oqituvchi_yangi' %}">Yangi o'qituvchi qo'shish</a>
+          </div>
+        </td></tr>
+        {% endfor %}
+        {% if holatlar %}
+        <tr class="print-hide" x-show="(qidiruv !== '' || faqatKamomad) && mosSoni() === 0" x-cloak>
+          <td colspan="7">
+            <div class="empty-state-rich">
+              <div class="empty-state-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              </div>
+              <div class="empty-state-title">Filtr bo'yicha o'qituvchi topilmadi</div>
+              <button type="button" class="btn btn-sm" @click="qidiruv = ''; faqatKamomad = false">Filtrni tozalash</button>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+      {% if holatlar %}
+      <tfoot>
+        <tr>
+          <td colspan="3" class="table-total-label">Jami:</td>
+          <td class="col-center" data-label="Minimal soat"><span class="hisobot-norma table-total-hour">{{ jami_min }} soat</span></td>
+          <td class="col-center" data-label="Yuklama soat"><span class="hour-tag ok table-total-hour">{{ jami_yuklama }} soat</span></td>
+          <td class="col-center" data-label="Farq"><span class="credits">—</span></td>
+          <td class="col-center" data-label="Holat"><span class="hour-tag {% if jami_yuklama < jami_min %}warn{% else %}ok{% endif %} table-total-hour">Qoplanish: {{ jami_yuklama|foiz:jami_min }}%</span></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
 </div>
 
 <div class="signatures">
   <div class="line">Kafedra mudiri</div>
   <div class="line">O'quv bo'limi boshlig'i</div>
+</div>
 </div>
 {% endblock %}

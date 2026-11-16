@@ -1,8 +1,7 @@
-"""Delegation state for the kafedra head's assignment panel.
+"""Kafedra mudiri paneli uchun yuklama taqsimlash holati.
 
-Shapes one FanSemestr's demand into per-type sections the UI can render:
-a single lecture slot, one slot per guruh for group types, and a
-student-count ledger for kurs ishi.
+FanSemestr talabini UI chiza oladigan bo'limlarga ajratadi: bitta ma'ruza o'rni,
+guruhli mashg'ulotlar uchun har guruhga alohida o'rin va kurs ishi hisobi.
 """
 
 from collections import defaultdict
@@ -26,7 +25,7 @@ class GuruhSlot:
 
 @dataclass(frozen=True)
 class TurHolati:
-    """One hour type's delegation section inside the panel."""
+    """Panel ichidagi bitta soat turining taqsimot bo'limi."""
 
     tur: str
     tur_nomi: str
@@ -43,6 +42,10 @@ class TurHolati:
         if self.talab_soat is None:
             return None
         return self.talab_soat - self.taqsimlangan_soat
+
+    @property
+    def band_oqituvchi_idlar(self) -> set[int]:
+        return {y.oqituvchi_id for y in self.kurs_ishi_yuklamalar}
 
 
 def fan_semestr_holati(fs: FanSemestr) -> list[TurHolati]:
@@ -89,19 +92,30 @@ def _tur_holati(
 
 @dataclass(frozen=True)
 class FsSatri:
-    """One dashboard row: a fan-semester with its per-type demand lines."""
+    """Dashboarddagi bitta qator: fan-semestr va uning soat turlari bo'yicha talabi."""
 
     fan_semestr: FanSemestr
     turlar: dict[str, TalabSatri]
 
     @property
     def qoldiq_bor(self) -> bool:
-        return any((t.qoldiq_soat or 0) > 0 for t in self.turlar.values())
+        return any(
+            t.talab_soat is None or (t.qoldiq_soat or 0) > 0
+            for t in self.turlar.values()
+        )
 
 
-def kafedra_fs_satrlari(kafedra: Department, akademik_yil: int) -> list[FsSatri]:
+def kafedra_fs_satrlari(
+    kafedra: Department,
+    akademik_yil: int,
+    *,
+    taqsimot: list[TalabSatri] | None = None,
+) -> list[FsSatri]:
     guruhlangan: dict[int, dict[str, TalabSatri]] = defaultdict(dict)
-    for satr in kafedra_taqsimoti(kafedra, akademik_yil):
+    satr_manbasi = (
+        taqsimot if taqsimot is not None else kafedra_taqsimoti(kafedra, akademik_yil)
+    )
+    for satr in satr_manbasi:
         guruhlangan[satr.fan_semestr.pk][satr.tur] = satr
     satrlar = [
         FsSatri(next(iter(turlar.values())).fan_semestr, turlar)
@@ -118,7 +132,7 @@ def kafedra_fs_satrlari(kafedra: Department, akademik_yil: int) -> list[FsSatri]
 
 
 def fs_satri(fs: FanSemestr) -> FsSatri:
-    """Rebuild a single row after a mutation, without the full-year query."""
+    """O'zgarishdan keyin umumiy yillik so'rovsiz bitta qatorni yangilaydi."""
     reja = fs.variant.fan.reja
     taqsimlangan = taqsimlangan_soatlar(FanSemestr.objects.filter(pk=fs.pk))
     turlar = {

@@ -1,38 +1,82 @@
-"""AOH review of submitted O'quv Dastur files: list, accept, decline, open."""
+"""Topshirilgan O'quv Dastur fayllarini ko'rib chiqish: qabul, rad etish, ochish."""
 
 from django.core.exceptions import ValidationError
-from django.http import FileResponse, HttpRequest, HttpResponse
+from django.db import transaction
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView
 
+from accounts.models import Department
+from plans.audit import audit_yoz
+from plans.bildirishnoma import dastur_korildi_xabari
 from plans.dastur.topshirish import (
     dastur_qabul_qilish,
     dastur_rad_etish,
     joriy_topshirishlar,
+    topshirilmagan_dasturlar,
+    topshirilmagan_dasturlar_soni,
 )
-from plans.models import DasturTopshirish, FanVariant
+from plans.models import AuditAmali, DasturTopshirish, FanVariant
 from web.forms.dastur import DasturRadEtishForm
-from web.mixins import OfficeAdminTalabMixin, office_admin_talab
+from web.mixins import (
+    OfisAdminTalabMixin,
+    musbat_int_yoki_none,
+    ofis_admin_talab,
+    xato_matni,
+)
 
 
-class DasturTopshirishlarView(OfficeAdminTalabMixin, ListView):
+class DasturTopshirishlarView(OfisAdminTalabMixin, ListView):
     template_name = "web/office/dasturlar/list.html"
     context_object_name = "topshirishlar"
 
+    def _kafedra_id(self) -> int | None:
+        return musbat_int_yoki_none(self.request.GET.get("kafedra"))
+
+    def _yil(self) -> int | None:
+        return musbat_int_yoki_none(self.request.GET.get("yil"))
+
     def get_queryset(self) -> list[DasturTopshirish]:
-        qs = DasturTopshirish.objects.select_related(
-            "variant__fan__reja", "variant__kafedra", "oqituvchi__foydalanuvchi"
-        )
-        topshirishlar = joriy_topshirishlar(qs)
         holat = self.request.GET.get("holat")
-        if holat:
-            topshirishlar = [t for t in topshirishlar if t.holat == holat]
-        return topshirishlar
+        if holat == "TOPSHIRILMAGAN":
+            return []
+        qs = DasturTopshirish.objects.select_related(
+            "variant__fan__reja",
+            "variant__kafedra",
+            "oqituvchi__foydalanuvchi",
+            "korib_chiqqan",
+        )
+        kafedra_id = self._kafedra_id()
+        if kafedra_id is not None:
+            qs = qs.filter(variant__kafedra_id=kafedra_id)
+        yil = self._yil()
+        if yil is not None:
+            qs = qs.filter(variant__fan__reja__boshlanish_yili=yil)
+        return joriy_topshirishlar(qs, holat=holat)
 
     def get_context_data(self, **kwargs: object) -> dict[str, object]:
         context = super().get_context_data(**kwargs)
-        context["holat"] = self.request.GET.get("holat", "")
+        holat = self.request.GET.get("holat", "")
+        kafedra_id = self._kafedra_id()
+        yil = self._yil()
+        if holat == "TOPSHIRILMAGAN":
+            topshirilmaganlar = topshirilmagan_dasturlar(kafedra_id=kafedra_id, yil=yil)
+            topshirilmagan_soni = len(topshirilmaganlar)
+        else:
+            topshirilmaganlar = []
+            topshirilmagan_soni = topshirilmagan_dasturlar_soni(
+                kafedra_id=kafedra_id, yil=yil
+            )
+        context.update(
+            {
+                "holat": holat,
+                "kafedra_id": kafedra_id,
+                "kafedralar": Department.objects.order_by("nomi"),
+                "topshirilmagan_soni": topshirilmagan_soni,
+                "topshirilmaganlar": topshirilmaganlar,
+            }
+        )
         return context
 
 
@@ -63,38 +107,74 @@ def _javob(
 
 
 @require_POST
-@office_admin_talab
+@ofis_admin_talab
 def dastur_qabul(request: HttpRequest, pk: int) -> HttpResponse:
-    topshirish = get_object_or_404(DasturTopshirish, pk=pk)
-    dastur_qabul_qilish(topshirish, request.user)
-    return _javob(request, topshirish.variant)
+    topshirish = get_object_or_404(
+        DasturTopshirish.objects.select_related(
+            "variant__fan__reja", "variant__kafedra", "oqituvchi__foydalanuvchi"
+        ),
+        pk=pk,
+    )
+    xato = None
+    try:
+        with transaction.atomic():
+            dastur_qabul_qilish(topshirish, request.user)
+            audit_yoz(
+                AuditAmali.TASDIQLANDI,
+                f"Fan dasturi qabul qilindi: {topshirish.variant.nomi}.",
+                obyekt=topshirish,
+                request=request,
+            )
+            dastur_korildi_xabari(topshirish)
+    except ValidationError as e:
+        xato = xato_matni(e)
+    return _javob(request, topshirish.variant, xato=xato)
 
 
 @require_POST
-@office_admin_talab
+@ofis_admin_talab
 def dastur_rad(request: HttpRequest, pk: int) -> HttpResponse:
-    topshirish = get_object_or_404(DasturTopshirish, pk=pk)
+    topshirish = get_object_or_404(
+        DasturTopshirish.objects.select_related(
+            "variant__fan__reja", "variant__kafedra", "oqituvchi__foydalanuvchi"
+        ),
+        pk=pk,
+    )
     form = DasturRadEtishForm(request.POST)
     xato = None
     if form.is_valid():
         try:
-            dastur_rad_etish(topshirish, request.user, form.cleaned_data["izoh"])
+            izoh = form.cleaned_data["izoh"]
+            with transaction.atomic():
+                dastur_rad_etish(topshirish, request.user, izoh)
+                audit_yoz(
+                    AuditAmali.QAYTARILDI,
+                    f"Fan dasturi rad etildi: {topshirish.variant.nomi}. Sabab: {izoh}",
+                    obyekt=topshirish,
+                    request=request,
+                )
+                dastur_korildi_xabari(topshirish)
         except ValidationError as e:
-            xato = " ".join(e.messages)
+            xato = xato_matni(e)
     else:
         xato = " ".join(x for xs in form.errors.values() for x in xs)
     return _javob(request, topshirish.variant, xato=xato)
 
 
-@office_admin_talab
+@ofis_admin_talab
 def dastur_fayl(request: HttpRequest, pk: int) -> HttpResponse:
     topshirish = get_object_or_404(DasturTopshirish, pk=pk)
-    return FileResponse(topshirish.fayl.open("rb"), as_attachment=True)
+    try:
+        return FileResponse(topshirish.fayl.open("rb"), as_attachment=True)
+    except FileNotFoundError as exc:
+        raise Http404("Fayl topilmadi.") from exc
 
 
-@office_admin_talab
+@ofis_admin_talab
 def dastur_tarixi(request: HttpRequest, variant_id: int) -> HttpResponse:
-    variant = get_object_or_404(FanVariant, pk=variant_id)
+    variant = get_object_or_404(
+        FanVariant.objects.select_related("fan__reja", "kafedra"), pk=variant_id
+    )
     return render(
         request, "web/office/dasturlar/_tarix_panel.html", _panel_kontekst(variant)
     )

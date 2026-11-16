@@ -3,11 +3,11 @@
 {% block content %}
 <div class="topbar">
   <div>
-    <div class="title">O'quv yuklamasi boshqaruv paneli</div>
+    <div class="title">Boshqaruv paneli</div>
   </div>
   <div class="controls">
     {% if yillar %}
-    <select name="yil" hx-get="{% url 'office:dashboard' %}" hx-target="#kontent" hx-swap="innerHTML" hx-push-url="true" hx-indicator="#yuklanish">
+    <select name="yil" aria-label="O'quv yili" hx-get="{% url 'office:dashboard' %}" hx-target="#kontent" hx-swap="innerHTML" hx-push-url="true" hx-indicator="#yuklanish">
       {% for y in yillar %}
       <option value="{{ y }}" {% if y == yil %}selected{% endif %}>{{ y }}/{{ y|add:1 }} o'quv yili</option>
       {% endfor %}
@@ -15,16 +15,27 @@
     {% endif %}
   </div>
 </div>
-<div style="position:relative;">
-  <div id="yuklanish" class="skeleton-overlay htmx-indicator">{% include "web/parts/_skeleton_jadval.html" %}</div>
-  <div id="kontent">
+<div class="office-dash-stage">
+  <div id="yuklanish" class="skeleton-overlay htmx-indicator">{% include "web/parts/_skeleton_jadval.html" with show_stats=True show_toolbar=True %}</div>
+  <div id="kontent" {% if not yil %}data-jonli="office-kontent"{% endif %}>
     {% if yil %}
       {% include "web/office/_dashboard_kontent.html" %}
     {% else %}
-      <div class="empty-state">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M3 7l2-3h14l2 3M3 7v12a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V7M3 7h18M8 11h8"/>
-        </svg>
+      <div class="card empty-state empty-state-rich">
+        <div class="empty-state-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+        </div>
+        <h3 class="empty-state-title">O'quv rejalar hali yuklanmagan</h3>
+        <p class="empty-state-desc">Boshlash uchun yangi o'quv reja (.xlsx) faylini yuklang. Yuklangandan so'ng fanlar taqsimoti va kafedralar kesimida nazorat shu yerda ko'rinadi.</p>
+        <a class="btn btn-primary" href="{% url 'office:reja_yangi' %}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Yangi reja yuklash</span>
+        </a>
       </div>
     {% endif %}
   </div>

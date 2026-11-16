@@ -1,0 +1,66 @@
+"""Sessiya xavfsizligi: hisob faolligini va majburiy parol almashtirishni tekshiradi."""
+
+from collections.abc import Callable
+
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import logout
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import redirect
+from django.urls import reverse
+
+
+class FaolFoydalanuvchiMiddleware:
+    """Hisobi o'chirilgan foydalanuvchini eski sessiyadan darhol chiqarib yuboradi."""
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        if request.user.is_authenticated and not request.user.is_active:
+            logout(request)
+            messages.error(request, "Hisobingiz faolsizlantirilgan.")
+        return self.get_response(request)
+
+
+class ParolAlmashtirishMajburiyMiddleware:
+    """Bir martalik parol bilan kirganlarni parol almashtirishga yo'naltiradi."""
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+
+    def _ruxsat_etilgan_yolmi(self, yol: str) -> bool:
+        static_url = getattr(settings, "STATIC_URL", "/static/")
+        if not static_url.startswith("/"):
+            static_url = f"/{static_url}"
+        if yol.startswith(static_url):
+            return True
+        ruxsat_nomlari = (
+            "parol_ozgartirish",
+            "chiqish",
+            "korinish_saqlash",
+            "profil_telegram_saqlash",
+            "healthcheck",
+            "kirish",
+            "offline_sahifa",
+            "service_worker",
+        )
+        return yol in {reverse(nom) for nom in ruxsat_nomlari}
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        user = getattr(request, "user", None)
+        if (
+            user is not None
+            and user.is_authenticated
+            and getattr(user, "parol_ozgartirish_kerak", False)
+            and not self._ruxsat_etilgan_yolmi(request.path_info)
+        ):
+            parol_url = reverse("parol_ozgartirish")
+            if request.path_info == reverse("jonli_holat"):
+                return JsonResponse({"manzil": parol_url}, status=403)
+            if request.headers.get("HX-Request"):
+                javob = HttpResponse(status=401)
+                javob["HX-Redirect"] = parol_url
+                return javob
+            return redirect(parol_url)
+        return self.get_response(request)

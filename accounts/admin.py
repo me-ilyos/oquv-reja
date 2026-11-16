@@ -20,6 +20,19 @@ class FoydalanuvchiAdmin(UserAdmin):
         (None, {"fields": ("telefon", "password")}),
         ("Shaxsiy ma'lumot", {"fields": ("first_name", "last_name")}),
         (
+            "Ko'rinish sozlamalari",
+            {
+                "fields": (
+                    "shrift_olchami",
+                    "yuqori_kontrast",
+                    "keng_rejim",
+                    "korinish_tanlangan",
+                    "parol_ozgartirish_kerak",
+                    "telegram_chat_id",
+                )
+            },
+        ),
+        (
             "Ruxsatlar",
             {
                 "fields": (
@@ -64,13 +77,15 @@ class OqituvchiTuriAdmin(admin.ModelAdmin):
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
     list_display = ("nomi", "mudir")
+    list_select_related = ("mudir__foydalanuvchi",)
 
 
 @admin.register(OqituvchiProfil)
 class OqituvchiProfilAdmin(admin.ModelAdmin):
     list_display = ("foydalanuvchi", "kafedra", "turi")
     list_filter = ("kafedra", "turi")
-    # Required for autocomplete_fields pointing here (plans.Yuklama.oqituvchi).
+    list_select_related = ("foydalanuvchi", "kafedra", "turi")
+    # plans.Yuklama.oqituvchi maydonidagi autocomplete_fields ishlashi uchun kerak.
     search_fields = (
         "foydalanuvchi__first_name",
         "foydalanuvchi__last_name",

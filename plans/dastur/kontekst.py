@@ -1,19 +1,46 @@
-"""Builds the docxtpl render context for one FanVariant's o'quv dastur."""
+"""Bitta FanVariant o'quv dasturi uchun docxtpl shablon ma'lumotlarini yig'adi."""
 
 from django.utils import timezone
 
-from accounts.models import Universitet
+from accounts.services import universitet_nomi
 from plans.dastur.mavzular import SOAT_MUSTAQIL_TOPSHIRIQDA, Natija, bosh_mavzular
 from plans.models import FanSemestr, FanVariant
 
 BLANK = "_____"
 
-# No model field records the language of instruction or the city; every
-# curriculum the platform handles is taught in Uzbek from Namangan.
+# Bazada ta'lim tili yoki shahar alohida maydonda saqlanmaydi; tizimdagi
+# barcha dasturlar Namangan shahrida, o'zbek tilida o'tiladi.
 TALIM_TILI = "O‘zbek"
 SHAHAR = "Namangan"
 
 TN_SONI = 8
+
+
+def _soatlar_va_mavzular(variant: FanVariant, mustaqil_soat: int) -> dict[str, object]:
+    return {
+        "hours": {
+            "lecture": _soat_matni(variant.maruza_soat),
+            "practice": _soat_matni(variant.amaliyot_soat),
+            "lab": _soat_matni(variant.laboratoriya_soat),
+            "seminar": _soat_matni(variant.seminar_soat),
+            "self_study": _soat_matni(mustaqil_soat),
+            "coursework": _soat_matni(variant.kurs_ishi_soat),
+        },
+        "purpose": "",
+        "tasks": "",
+        "prerequisites": ["", "", ""],
+        "outcomes": {
+            "professional": [Natija(f"TN{i}", "") for i in range(1, TN_SONI + 1)],
+            "skills": [Natija(f"TN{i}", "") for i in range(1, TN_SONI + 1)],
+        },
+        "lectures": bosh_mavzular(variant.maruza_soat, "M"),
+        "practicals": bosh_mavzular(variant.amaliyot_soat, "A"),
+        "labs": bosh_mavzular(variant.laboratoriya_soat, "L"),
+        "seminars": bosh_mavzular(variant.seminar_soat, "S"),
+        "self_study_tasks": bosh_mavzular(
+            mustaqil_soat, "", soat_mavzuda=SOAT_MUSTAQIL_TOPSHIRIQDA
+        ),
+    }
 
 
 def dastur_kontekst(variant: FanVariant) -> dict[str, object]:
@@ -47,34 +74,12 @@ def dastur_kontekst(variant: FanVariant) -> dict[str, object]:
         "plan_number": _kod_bilan(reja.yonalish_kodi, fan.raqam),
         "total_hours": _soat_matni(fan.jami_soat or 0),
         "classroom_total": _soat_matni(variant.auditoriya_soat),
-        "hours": {
-            "lecture": _soat_matni(variant.maruza_soat),
-            "practice": _soat_matni(variant.amaliyot_soat),
-            "lab": _soat_matni(variant.laboratoriya_soat),
-            "seminar": _soat_matni(variant.seminar_soat),
-            "self_study": _soat_matni(mustaqil_soat),
-            "coursework": _soat_matni(variant.kurs_ishi_soat),
-        },
-        "purpose": "",
-        "tasks": "",
-        "prerequisites": ["", "", ""],
-        "outcomes": {
-            "professional": [Natija(f"TN{i}", "") for i in range(1, TN_SONI + 1)],
-            "skills": [Natija(f"TN{i}", "") for i in range(1, TN_SONI + 1)],
-        },
-        "lectures": bosh_mavzular(variant.maruza_soat, "M"),
-        "practicals": bosh_mavzular(variant.amaliyot_soat, "A"),
-        "labs": bosh_mavzular(variant.laboratoriya_soat, "L"),
-        "seminars": bosh_mavzular(variant.seminar_soat, "S"),
-        "self_study_tasks": bosh_mavzular(
-            mustaqil_soat, "", soat_mavzuda=SOAT_MUSTAQIL_TOPSHIRIQDA
-        ),
+        **_soatlar_va_mavzular(variant, mustaqil_soat),
     }
 
 
 def _kod_bilan(kodi: str, matn: str) -> str:
-    """Official documents join a classifier code to its name with a spaced
-    en-dash — used for both the soha/yonalish lines and the plan number."""
+    """Rasmiy hujjatlarda kod va nom orasiga bo'shliqli tire qo'yiladi."""
     return f"{kodi} – {matn}" if kodi else matn
 
 
@@ -94,5 +99,4 @@ def _muqova_yili(semestrlar: list[FanSemestr]) -> int:
 
 
 def _universitet_nomi() -> str:
-    universitet = Universitet.objects.first()
-    return universitet.rasmiy_nomi if universitet else "Turan International University"
+    return universitet_nomi(bosh="Turan International University")

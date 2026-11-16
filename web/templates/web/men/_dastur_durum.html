@@ -1,12 +1,90 @@
 {% with joriy=variant.dastur_topshirishlari.all.0 %}
-{% if joriy %}
-<div>
-  {% if joriy.holat == "QABUL_QILINDI" %}<span class="tag tag-mand">QABUL QILINDI</span>
-  {% elif joriy.holat == "RAD_ETILDI" %}<span class="tag tag-rad">RAD ETILDI · {{ joriy.urinish_raqami }}-urinish</span>
-  {% else %}<span class="tag tag-elec">KO'RIB CHIQILMOQDA · {{ joriy.urinish_raqami }}-urinish</span>{% endif %}
+<div class="dastur-durum-cell"
+     x-data="amalMenyu()"
+     @keydown.escape.window="yopish()"
+     @scroll.window.capture="skrollYopish($event)"
+     @resize.window="yopish()"
+     @action-menu:yopish.window="yopish()">
+  {# Status badge — clicking opens the panel #}
+  <button type="button" class="status-btn"
+          hx-get="{% url 'men:dastur_tarixi' variant.pk %}"
+          hx-target="#dastur-panel-{{ variant.pk }}"
+          hx-swap="innerHTML"
+          hx-indicator="#htmx-yuklanish"
+          hx-on::before-request="const p = document.getElementById('dastur-panel-{{ variant.pk }}'); if (p && p.innerHTML.trim() !== '') { yopishTableModal(p); event.preventDefault(); }"
+          title="Topshirish va tarixni ko'rish">
+    {% if joriy %}
+      {% if joriy.holat == "QABUL_QILINDI" %}
+        <span class="tag tag-mand">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Qabul qilindi</span>
+        </span>
+      {% elif joriy.holat == "RAD_ETILDI" %}
+        <span class="tag tag-rad">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <span>Rad etildi · {{ joriy.urinish_raqami }}</span>
+        </span>
+      {% else %}
+        <span class="tag tag-elec">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Ko'rib chiqilmoqda</span>
+        </span>
+      {% endif %}
+    {% else %}
+      <span class="tag tag-bosh">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Topshirilmagan</span>
+      </span>
+    {% endif %}
+  </button>
+
+  {# 3-dots action menu #}
+  <div class="action-dropdown" :class="ochiq && 'dropdown-ochiq'" @click.outside="yopish()">
+    <button type="button" class="btn-dots" :class="ochiq && 'active'" @click="ochish($el)" :aria-expanded="ochiq.toString()" title="Amallar" aria-label="Amallar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="12" cy="5" r="2"/>
+        <circle cx="12" cy="12" r="2"/>
+        <circle cx="12" cy="19" r="2"/>
+      </svg>
+    </button>
+
+    <div class="action-menu action-menu-fixed"
+         x-ref="menyuOyna"
+         :class="tepagaOchil && 'popover-up'"
+         x-show="ochiq"
+         x-transition:enter="anim-pop-enter" x-transition:enter-start="anim-pop-start" x-transition:enter-end="anim-pop-end"
+         x-transition:leave="anim-pop-leave" x-transition:leave-start="anim-pop-end" x-transition:leave-end="anim-pop-start"
+         x-cloak
+         :style="'top:' + pos.top + '; left:' + pos.left + ';'">
+      <a class="action-item" href="{% url 'men:dastur' variant.pk %}" hx-boost="false" @click="ochiq = false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <div class="action-text">
+          <span class="action-title">Shablon (.docx)</span>
+        </div>
+      </a>
+
+      <button type="button" class="action-item"
+              hx-get="{% url 'men:dastur_tarixi' variant.pk %}"
+              hx-target="#dastur-panel-{{ variant.pk }}"
+              hx-swap="innerHTML"
+              hx-indicator="#htmx-yuklanish"
+              @click="ochiq = false"
+              hx-on::before-request="const p = document.getElementById('dastur-panel-{{ variant.pk }}'); if (p && p.innerHTML.trim() !== '') { yopishTableModal(p); event.preventDefault(); }">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        <div class="action-text">
+          <span class="action-title">Topshirish va tarix</span>
+        </div>
+      </button>
+    </div>
+  </div>
 </div>
-{% endif %}
-<button type="button" class="btn" style="margin-top:4px;"
-        hx-get="{% url 'men:dastur_tarixi' variant.pk %}"
-        hx-target="#dastur-panel-{{ variant.pk }}" hx-swap="innerHTML">Ko'rish</button>
 {% endwith %}

@@ -1,8 +1,7 @@
-"""Delegation forms: each maps one Yuklama shape onto model validation.
+"""Yuklama taqsimlash formalari: har biri bitta Yuklama shaklini modelga bog'laydi.
 
-ModelForm._post_clean runs Yuklama.full_clean(), so every model rule
-(variant selected, hours exist, guruh belongs to the reja, kurs-ishi
-capacity, DB shape constraints) surfaces as a form error.
+ModelForm._post_clean() ichida Yuklama.full_clean() ishga tushadi — shu sababli
+model cheklovlari DB IntegrityError ga aylanib ketmasdan forma xatosiga tushadi.
 """
 
 from django import forms
@@ -25,14 +24,15 @@ class YuklamaAsosForm(forms.ModelForm):
     ):
         super().__init__(*args, **kwargs)
         self.instance.fan_semestr = fan_semestr
-        self.fields["oqituvchi"].queryset = OqituvchiProfil.objects.filter(
-            kafedra=kafedra
-        ).select_related("foydalanuvchi")
+        self.fields["oqituvchi"].queryset = (
+            OqituvchiProfil.objects.kafedrada(kafedra)
+            .bilan_foydalanuvchi()
+            .filter(foydalanuvchi__is_active=True)
+        )
 
     def _get_validation_exclusions(self) -> set[str]:
-        # fan_semestr/tur are set programmatically; keep them in full_clean so
-        # the shape constraints (uniq_guruh_yuklama, chk_yuklama_shakl) raise
-        # form errors instead of DB IntegrityError.
+        # fan_semestr/tur dasturdan qo'yiladi; full_clean da qolsin —
+        # shunda uniq_guruh_yuklama / chk_yuklama_shakl DB xatosiga tushmaydi.
         return super()._get_validation_exclusions() - {
             "fan_semestr",
             "tur",
@@ -45,6 +45,20 @@ class MaruzaYuklamaForm(YuklamaAsosForm):
     def __init__(self, *args: object, **kwargs: object):
         super().__init__(*args, **kwargs)
         self.instance.tur = SoatTuri.MARUZA
+
+    def clean(self) -> dict[str, object]:
+        cleaned = super().clean()
+        if (
+            Yuklama.objects.filter(
+                fan_semestr=self.instance.fan_semestr, tur=SoatTuri.MARUZA
+            )
+            .exclude(pk=self.instance.pk)
+            .exists()
+        ):
+            raise forms.ValidationError(
+                "Bu fan semestriga ma'ruza allaqachon biriktirilgan."
+            )
+        return cleaned
 
 
 class GuruhYuklamaForm(YuklamaAsosForm):
@@ -64,16 +78,50 @@ class GuruhYuklamaForm(YuklamaAsosForm):
 
     def clean(self) -> dict[str, object]:
         cleaned = super().clean()
-        if cleaned.get("tur"):
-            self.instance.tur = cleaned["tur"]
+        tur = cleaned.get("tur")
+        guruh = cleaned.get("guruh")
+        if tur:
+            self.instance.tur = tur
+        if (
+            tur
+            and guruh
+            and Yuklama.objects.filter(
+                fan_semestr=self.instance.fan_semestr, tur=tur, guruh=guruh
+            )
+            .exclude(pk=self.instance.pk)
+            .exists()
+        ):
+            raise forms.ValidationError(
+                "Bu guruhga tanlangan mashg'ulot turi allaqachon biriktirilgan."
+            )
         return cleaned
 
 
 class KursIshiYuklamaForm(YuklamaAsosForm):
+    talabalar_soni = forms.IntegerField(
+        label="Talabalar soni",
+        min_value=1,
+        widget=forms.NumberInput(attrs={"min": 1}),
+    )
+
     class Meta(YuklamaAsosForm.Meta):
         fields = ["oqituvchi", "talabalar_soni"]
 
     def __init__(self, *args: object, **kwargs: object):
         super().__init__(*args, **kwargs)
         self.instance.tur = SoatTuri.KURS_ISHI
-        self.fields["talabalar_soni"].required = True
+
+    def clean_oqituvchi(self) -> OqituvchiProfil:
+        oqituvchi = self.cleaned_data["oqituvchi"]
+        mavjud = Yuklama.objects.filter(
+            fan_semestr=self.instance.fan_semestr,
+            tur=SoatTuri.KURS_ISHI,
+            oqituvchi=oqituvchi,
+        )
+        if self.instance.pk is not None:
+            mavjud = mavjud.exclude(pk=self.instance.pk)
+        if mavjud.exists():
+            raise forms.ValidationError(
+                "Bu o'qituvchiga ushbu fandan kurs ishi allaqachon biriktirilgan."
+            )
+        return oqituvchi

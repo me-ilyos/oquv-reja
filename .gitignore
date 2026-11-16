@@ -1,6 +1,8 @@
 .env
 .env/
 env
+venv/
+.venv/
 output/
 sources/
 __pycache__/
@@ -11,3 +13,11 @@ media/
 staticfiles/
 .mcp.json
 .playwright-mcp/
+*.zip
+logs/
+backups/
+test_db.sqlite3
+*.py[cod]
+.coverage
+htmlcov/
+.DS_Store

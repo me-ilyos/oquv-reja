@@ -1,19 +1,1507 @@
-{% load static %}<!DOCTYPE html>
+{% load static %}
+<!DOCTYPE html>
 <html lang="uz">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}O'quv yuklamasi{% endblock %}</title>
-<link rel="stylesheet" href="{% static 'web/css/app.css' %}">
-<script src="{% static 'web/js/htmx.min.js' %}" defer></script>
-<script src="{% static 'web/js/alpine.min.js' %}" defer></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"historyCacheSize": 0}'>
+  <title>{% block title %}O'quv yuklamasi{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a2a6e'/%3E%3Cpath d='M8 9.5A2.5 2.5 0 0 1 10.5 7H24v16H10.5A2.5 2.5 0 0 0 8 25V9.5z' fill='none' stroke='%23ffffff' stroke-width='2.2' stroke-linejoin='round'/%3E%3Cpath d='M12 12h8M12 16h5' stroke='%23ffffff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
+  <meta name="login-url" content="{% url 'kirish' %}">
+  <link rel="stylesheet" href="{% static 'web/css/app.css' %}?v=64">
+  <link rel="stylesheet" href="{% static 'web/css/print.css' %}?v=6">
+  <script src="{% static 'web/js/htmx.min.js' %}" defer></script>
+  <script>
+    document.addEventListener('htmx:configRequest', (e) => {
+      const csrfEl = document.getElementById('csrf-meta');
+      if (csrfEl && csrfEl.dataset.csrf) {
+        e.detail.headers['X-CSRFToken'] = csrfEl.dataset.csrf;
+      }
+    });
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('popover', () => ({
+        ochiq: false,
+        q: '',
+      }));
+      Alpine.data('jadvalPopover', (sozlamalar = {}) => {
+        const ochiqKalit = sozlamalar.ochiq || 'ochiq';
+        const qKalit = sozlamalar.q || 'q';
+        return {
+          [ochiqKalit]: false,
+          [qKalit]: '',
+          tepagaOchil: false,
+          posStyle: {},
+          mosSoni() {
+            const royxat = this.$refs.royxat;
+            if (!royxat) return 0;
+            const kalit = (this[qKalit] || '').trim().toLowerCase();
+            let soni = 0;
+            for (const el of royxat.querySelectorAll('[data-nomi]')) {
+              if (!kalit || (el.dataset.nomi || '').includes(kalit)) soni += 1;
+            }
+            return soni;
+          },
+          joylash(tugmaEl) {
+            const el = tugmaEl || this.$el.querySelector('button.teacher-chip') || this.$el;
+            const popoverEl = this.$refs.popoverOyna;
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            const pastBosh = window.innerHeight - rect.bottom - 12;
+            const tepaBosh = rect.top - 12;
+            const yuqoriga = pastBosh < 270 && tepaBosh > pastBosh;
+            this.tepagaOchil = yuqoriga;
+            const kenglik = Math.min((popoverEl && popoverEl.offsetWidth) || 268, window.innerWidth - 20);
+            const left = Math.max(10, Math.min(rect.right - kenglik, window.innerWidth - kenglik - 10));
+            const maxH = Math.max(140, Math.min(320, yuqoriga ? tepaBosh : pastBosh));
+            this.posStyle = yuqoriga
+              ? {
+                  left: Math.round(left) + 'px',
+                  bottom: Math.round(Math.max(10, window.innerHeight - rect.top + 6)) + 'px',
+                  top: 'auto',
+                  maxHeight: Math.round(maxH) + 'px',
+                }
+              : {
+                  left: Math.round(left) + 'px',
+                  top: Math.round(Math.max(10, rect.bottom + 6)) + 'px',
+                  bottom: 'auto',
+                  maxHeight: Math.round(maxH) + 'px',
+                };
+          },
+          ochishYopish(tugmaEl) {
+            const holat = !this[ochiqKalit];
+            if (holat) {
+              this.$el.closest('.table-wrap')?.classList.add('anim-tugadi');
+              this.joylash(tugmaEl);
+            } else {
+              this.tepagaOchil = false;
+            }
+            this[ochiqKalit] = holat;
+            if (holat) {
+              this.$nextTick(() => {
+                this.joylash(tugmaEl);
+                this.$refs.qidiruvInput?.focus();
+              });
+            }
+          },
+          yopish() {
+            this[ochiqKalit] = false;
+            this.tepagaOchil = false;
+          },
+          skrollYopish(e) {
+            if (!this[ochiqKalit]) return;
+            const maqsad = e?.target;
+            if (maqsad instanceof Element && maqsad.closest('.popover-fixed')) return;
+            this.yopish();
+          },
+        };
+      });
+      Alpine.data('jadvalQidiruv', () => ({
+        qidiruv: '',
+        mos(el) {
+          if (!this.qidiruv) return true;
+          const matn = (el.dataset.nomi || '').toLowerCase();
+          return matn.includes(this.qidiruv.toLowerCase());
+        }
+      }));
+      Alpine.data('amalMenyu', () => ({
+        ochiq: false,
+        tepagaOchil: false,
+        pos: { top: '0px', left: '0px' },
+        _tugma: null,
+        joylash(btn) {
+          const el = btn || this._tugma;
+          if (!el) return;
+          const menyu = this.$refs.menyuOyna;
+          const rect = el.getBoundingClientRect();
+          const menuW = Math.min((menyu && menyu.offsetWidth) || 240, window.innerWidth - 20);
+          const menuH = Math.min((menyu && menyu.offsetHeight) || 240, window.innerHeight - 20);
+          const l = Math.max(10, Math.min(rect.right - menuW, window.innerWidth - menuW - 10));
+          const pastBosh = window.innerHeight - rect.bottom - 10;
+          const tepaBosh = rect.top - 10;
+          const yuqoriga = pastBosh < menuH && tepaBosh > pastBosh;
+          this.tepagaOchil = yuqoriga;
+          const t = yuqoriga
+            ? Math.max(10, rect.top - menuH - 6)
+            : Math.max(10, Math.min(rect.bottom + 6, window.innerHeight - menuH - 10));
+          this.pos = { top: Math.round(t) + 'px', left: Math.round(l) + 'px' };
+        },
+        ochish(btn) {
+          if (this.ochiq) { this.yopish(); return; }
+          this._tugma = btn;
+          window.dispatchEvent(new CustomEvent('action-menu:yopish'));
+          this.$el.closest('.table-wrap')?.classList.add('anim-tugadi');
+          this.joylash(btn);
+          this.ochiq = true;
+          this.$nextTick(() => {
+            if (this.ochiq) this.joylash(btn);
+          });
+        },
+        yopish() {
+          this.ochiq = false;
+          this.tepagaOchil = false;
+        },
+        skrollYopish(e) {
+          if (!this.ochiq) return;
+          const maqsad = e?.target;
+          if (maqsad instanceof Element && maqsad.closest('.action-menu-fixed')) return;
+          this.yopish();
+        },
+      }));
+      window.nusxaOlish = async (matn) => {
+        if (!matn) return false;
+        if (navigator.clipboard && window.isSecureContext) {
+          try {
+            await navigator.clipboard.writeText(matn);
+            return true;
+          } catch {}
+        }
+        const area = document.createElement('textarea');
+        area.value = matn;
+        area.setAttribute('readonly', '');
+        area.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+        document.body.appendChild(area);
+        area.select();
+        let ok = false;
+        try {
+          ok = document.execCommand('copy');
+        } catch {
+          ok = false;
+        }
+        area.remove();
+        return ok;
+      };
+      Alpine.data('korinishModal', (boshlangich) => ({
+        ochiq: false,
+        saqlanmoqda: false,
+        xato: '',
+        majburiy: Boolean(boshlangich.majburiy),
+        shrift: boshlangich.shrift || 'standart',
+        yuqoriKontrast: Boolean(boshlangich.yuqoriKontrast),
+        kengRejim: Boolean(boshlangich.kengRejim),
+        saqlashUrl: boshlangich.saqlashUrl,
+        asl: {
+          shrift: boshlangich.shrift || 'standart',
+          yuqoriKontrast: Boolean(boshlangich.yuqoriKontrast),
+          kengRejim: Boolean(boshlangich.kengRejim),
+        },
+        init() {
+          this.qollash();
+          if (this.majburiy) {
+            if (window.__pageLoaderYopilgan) {
+              setTimeout(() => { this.ochish(); }, 80);
+            } else {
+              window.addEventListener('pageloader:hidden', () => {
+                if (this.majburiy && !this.ochiq) {
+                  setTimeout(() => { this.ochish(); }, 120);
+                }
+              }, { once: true });
+            }
+          }
+          window.addEventListener('korinish:ochish', () => this.ochish());
+        },
+        _bekorTimer: null,
+        ochish() {
+          clearTimeout(this._bekorTimer);
+          this._bekorTimer = null;
+          if (!this.ochiq && document.activeElement instanceof HTMLElement) {
+            this._lastFocus = document.activeElement;
+          }
+          this.shrift = this.asl.shrift;
+          this.yuqoriKontrast = this.asl.yuqoriKontrast;
+          this.kengRejim = this.asl.kengRejim;
+          this.qollash();
+          this.xato = '';
+          this.ochiq = true;
+          setTimeout(() => {
+            const card = document.querySelector('#korinish-sozlash-modal .onb-card');
+            if (!card) return;
+            const first = Array.from(card.querySelectorAll('button:not([disabled])')).find(
+              (el) => el.offsetParent !== null
+            );
+            first?.focus?.();
+          }, 40);
+        },
+        _lastFocus: null,
+        qollash() {
+          const b = document.body;
+          b.classList.remove('ui-font-standart', 'ui-font-yirik', 'ui-font-juda_yirik');
+          b.classList.add('ui-font-' + this.shrift);
+          b.classList.toggle('ui-kontrast', Boolean(this.yuqoriKontrast));
+          b.classList.toggle('ui-keng', Boolean(this.kengRejim));
+        },
+        yopish() {
+          if (this.majburiy || !this.ochiq) return;
+          const ozgardi = this.shrift !== this.asl.shrift
+            || this.yuqoriKontrast !== this.asl.yuqoriKontrast
+            || this.kengRejim !== this.asl.kengRejim;
+          const tezkor = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          this.ochiq = false;
+          if (this._lastFocus && document.contains(this._lastFocus)) {
+            this._lastFocus.focus();
+          }
+          this._lastFocus = null;
+          if (!ozgardi) return;
+          clearTimeout(this._bekorTimer);
+          const tiklash = () => {
+            this._bekorTimer = null;
+            if (this.ochiq) return;
+            this.shrift = this.asl.shrift;
+            this.yuqoriKontrast = this.asl.yuqoriKontrast;
+            this.kengRejim = this.asl.kengRejim;
+            this.qollash();
+          };
+          this._bekorTimer = setTimeout(tiklash, tezkor ? 30 : 220);
+        },
+        _toastKorsat(matn) {
+          window.showAppToast?.(matn, 'success');
+        },
+        async saqlash() {
+          clearTimeout(this._bekorTimer);
+          this._bekorTimer = null;
+          this.saqlanmoqda = true;
+          this.xato = '';
+          try {
+            const fd = new FormData();
+            fd.append('shrift_olchami', this.shrift);
+            fd.append('yuqori_kontrast', this.yuqoriKontrast ? 'true' : 'false');
+            fd.append('keng_rejim', this.kengRejim ? 'true' : 'false');
+            const csrf = document.getElementById('csrf-meta')?.dataset?.csrf || '';
+            const res = await fetch(this.saqlashUrl, {
+              method: 'POST',
+              headers: {
+                'X-CSRFToken': csrf,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+              },
+              body: fd,
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+              this.xato = "Sozlamalarni saqlashda xatolik yuz berdi.";
+              return;
+            }
+            this.asl = {
+              shrift: this.shrift,
+              yuqoriKontrast: this.yuqoriKontrast,
+              kengRejim: this.kengRejim,
+            };
+            this.majburiy = false;
+            this.ochiq = false;
+            if (this._lastFocus && document.contains(this._lastFocus)) {
+              this._lastFocus.focus();
+            }
+            this._lastFocus = null;
+            this._toastKorsat("Ko'rinish sozlamalari saqlandi.");
+          } catch (_e) {
+            this.xato = "Server bilan aloqa uzildi. Qayta urinib ko'ring.";
+          } finally {
+            this.saqlanmoqda = false;
+          }
+        },
+      }));
+      window.addEventListener('korinish:escape', () => {
+        const modalEl = document.getElementById('korinish-sozlash-modal');
+        if (!modalEl || !window.Alpine) return;
+        const data = window.Alpine.$data(modalEl);
+        if (data && data.ochiq && !data.majburiy) data.yopish();
+      });
+    });
+
+    function showAppToast(matn, tur = 'success') {
+      const joy = document.getElementById('app-messages');
+      if (!joy || !matn) return;
+      let box = joy.querySelector('ul.messages');
+      if (!box) {
+        box = document.createElement('ul');
+        box.className = 'messages';
+        joy.appendChild(box);
+      }
+      const el = document.createElement('li');
+      el.className = tur;
+      const text = document.createElement('span');
+      text.className = 'msg-text';
+      text.textContent = matn;
+      el.appendChild(text);
+      box.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('is-leaving');
+        setTimeout(() => el.remove(), 260);
+      }, 3500);
+    }
+    window.showAppToast = showAppToast;
+
+    // ================= 1. Markaziy Yuklanish (Breandli 3-sekundlik Page Loader) =================
+    const PageLoader = {
+      el: null,
+      safetyTimer: null,
+      delayTimer: null,
+      init() {
+        this.el = document.getElementById('main-page-loader');
+      },
+      _progressQayta() {
+        const fill = this.el?.querySelector('.loader-progress-fill');
+        if (!fill) return;
+        fill.style.animation = 'none';
+        void fill.offsetWidth;
+        fill.style.animation = '';
+      },
+      show(maxMs = 4000, delayMs = 0) {
+        if (!this.el) this.init();
+        if (!this.el) return;
+        clearTimeout(this.delayTimer);
+        clearTimeout(this.safetyTimer);
+        this.el.classList.remove('is-timed');
+        const reveal = () => {
+          if (!this.el) return;
+          document.body?.classList.add('is-page-loading');
+          this.el.classList.remove('is-hidden');
+          this.safetyTimer = setTimeout(() => this.hide(true), maxMs);
+        };
+        if (delayMs > 0) {
+          this.delayTimer = setTimeout(reveal, delayMs);
+        } else {
+          reveal();
+        }
+      },
+      playFor(ms = 320) {
+        if (!this.el) this.init();
+        if (!this.el) return;
+        window.__pageLoaderYopilgan = false;
+        clearTimeout(this.delayTimer);
+        clearTimeout(this.safetyTimer);
+        const muddat = Math.min(Math.max(Number(ms) || 320, 80), 450);
+        document.body?.classList.add('is-page-loading');
+        this.el.classList.add('is-timed');
+        this.el.classList.remove('is-hidden');
+        this._progressQayta();
+        this.safetyTimer = setTimeout(() => {
+          this.hide(true);
+        }, muddat);
+      },
+      hide() {
+        if (!this.el) this.init();
+        clearTimeout(this.delayTimer);
+        clearTimeout(this.safetyTimer);
+        if (this.el) {
+          this.el.classList.add('is-hidden');
+          this.el.classList.remove('is-timed');
+        }
+        document.body?.classList.remove('is-page-loading');
+        window.__pageLoaderYopilgan = true;
+        window.dispatchEvent(new CustomEvent('pageloader:hidden'));
+      }
+    };
+    window.PageLoader = PageLoader;
+
+    // ================= 1.2. Sekin HTMX Yuklanishlarda Suv Belgili Skelet =================
+    const SkeletonStage = {
+      active: new WeakMap(),
+      targetXhr: new WeakMap(),
+      _indicatorSelector(evt) {
+        const elt = evt.detail?.elt;
+        if (!elt || !elt.closest) return '';
+        const carrier = elt.hasAttribute('hx-indicator') ? elt : elt.closest('[hx-indicator]');
+        return carrier ? (carrier.getAttribute('hx-indicator') || '').trim() : '';
+      },
+      shouldStage(evt) {
+        const target = evt.detail?.target;
+        if (!(target instanceof HTMLElement)) return false;
+        if (target === document.body || target.matches('.app, main, #rol-royxati, tr, td, th, button, a, span')) {
+          return false;
+        }
+        const ind = this._indicatorSelector(evt);
+        if (ind && ind !== '#htmx-yuklanish' && document.querySelector(ind)) return false;
+        const isPanel = target.id.startsWith('dastur-panel-') || target.id.startsWith('panel-');
+        if (isPanel) return true;
+        return (
+          target.matches('[id$="-jonli"], [id$="-bolim"], #kontent, .table-wrap, .analitika-card, .report-sheet') ||
+          Boolean(target.querySelector('.table-wrap, .stats, table, .analitika-card, .report-sheet'))
+        );
+      },
+      _cloneWatermark(compact, label) {
+        const tpl = document.getElementById('tpl-skeleton-watermark');
+        const frag = tpl ? tpl.content.cloneNode(true) : document.createDocumentFragment();
+        const seal = frag.querySelector?.('.skeleton-watermark-seal');
+        if (seal) {
+          if (compact) seal.classList.add('is-compact');
+          const sub = seal.querySelector('.skeleton-wm-sub');
+          if (sub && label) sub.textContent = label;
+        }
+        return frag;
+      },
+      _makeBars(parent, specs) {
+        specs.forEach((cls) => {
+          const bar = document.createElement('div');
+          bar.className = `skeleton-bar ${cls}`;
+          parent.appendChild(bar);
+        });
+      },
+      _buildPanelStage() {
+        const box = document.createElement('div');
+        box.className = 'htmx-skeleton-stage is-inline-panel skeleton-watermark-shell skeleton-panel-box';
+        box.setAttribute('aria-hidden', 'true');
+        box.appendChild(this._cloneWatermark(true, 'Panel yuklanmoqda…'));
+        const head = document.createElement('div');
+        head.className = 'skeleton-panel-head';
+        this._makeBars(head, ['sk-title sk-w-34', 'sk-pill sk-w-14']);
+        box.appendChild(head);
+        const grid = document.createElement('div');
+        grid.className = 'skeleton-panel-grid';
+        ['sk-w-75', 'sk-w-60'].forEach((wCls) => {
+          const slot = document.createElement('div');
+          slot.className = 'skeleton-panel-slot';
+          this._makeBars(slot, ['sk-sm sk-w-45', wCls, 'sk-btn sk-w-28']);
+          grid.appendChild(slot);
+        });
+        box.appendChild(grid);
+        return box;
+      },
+      _buildStage(target) {
+        const isPanel = target.id.startsWith('dastur-panel-') || target.id.startsWith('panel-');
+        if (isPanel) return this._buildPanelStage();
+
+        const stage = document.createElement('div');
+        stage.className = 'htmx-skeleton-stage skeleton-watermark-shell';
+        stage.setAttribute('aria-hidden', 'true');
+        stage.appendChild(this._cloneWatermark(false, "Ma'lumot yuklanmoqda…"));
+
+        if (target.querySelector('.topbar')) {
+          const tb = document.createElement('div');
+          tb.className = 'skeleton-topbar';
+          this._makeBars(tb, ['sk-title sk-w-30', 'sk-btn sk-w-18']);
+          stage.appendChild(tb);
+        }
+
+        const statsEl = target.querySelector('.stats');
+        if (statsEl) {
+          const count = Math.min(4, Math.max(2, statsEl.querySelectorAll('.stat').length || 4));
+          const grid = document.createElement('div');
+          grid.className = 'skeleton-stat-grid';
+          for (let i = 0; i < count; i += 1) {
+            const card = document.createElement('div');
+            card.className = 'skeleton-stat-card';
+            this._makeBars(card, ['sk-lg sk-w-34', 'sk-sm sk-w-60']);
+            grid.appendChild(card);
+          }
+          stage.appendChild(grid);
+        }
+
+        if (target.querySelector('.filter-toolbar, .subtoolbar')) {
+          const bar = document.createElement('div');
+          bar.className = 'skeleton-toolbar';
+          this._makeBars(bar, ['sk-btn sk-w-30']);
+          const chips = document.createElement('div');
+          chips.className = 'skeleton-toolbar-chips';
+          this._makeBars(chips, ['sk-pill sk-w-14', 'sk-pill sk-w-14']);
+          bar.appendChild(chips);
+          stage.appendChild(bar);
+        }
+
+        const tableEl = target.querySelector('.table-wrap, table, .analitika-table');
+        if (tableEl || !target.querySelector('.card, .report-sheet, .analitika-card')) {
+          const tbl = document.createElement('div');
+          tbl.className = 'skeleton-table';
+          const head = document.createElement('div');
+          head.className = 'skeleton-row head';
+          this._makeBars(head, ['sk-w-12', 'sk-w-30', 'sk-w-14', 'sk-w-14', 'sk-w-18']);
+          tbl.appendChild(head);
+          for (let i = 0; i < 5; i += 1) {
+            const row = document.createElement('div');
+            row.className = 'skeleton-row';
+            this._makeBars(row, ['sk-w-10', 'sk-w-34', 'sk-w-12', 'sk-w-12', 'sk-w-20']);
+            tbl.appendChild(row);
+          }
+          stage.appendChild(tbl);
+        } else {
+          const cardBox = document.createElement('div');
+          cardBox.className = 'skeleton-card-box';
+          this._makeBars(cardBox, ['sk-title sk-w-45', 'sk-w-75', 'sk-w-60', 'sk-w-34']);
+          stage.appendChild(cardBox);
+        }
+        return stage;
+      },
+      start(evt) {
+        if (!this.shouldStage(evt)) return;
+        const xhr = evt.detail?.xhr;
+        const target = evt.detail?.target;
+        if (!xhr || !target) return;
+        const prevXhr = this.targetXhr.get(target);
+        if (prevXhr) this.finish({ detail: { xhr: prevXhr } });
+        this.targetXhr.set(target, xhr);
+        const isPanel = target.id.startsWith('dastur-panel-') || target.id.startsWith('panel-');
+        const delay = isPanel ? 100 : 150;
+        const state = { timer: null, target, stageEl: null, prevMinHeight: target.style.minHeight };
+        this.active.set(xhr, state);
+        state.timer = window.setTimeout(() => {
+          if (this.targetXhr.get(target) !== xhr || !target.isConnected) return;
+          if (!isPanel && target.offsetHeight > 0) {
+            target.style.minHeight = `${Math.max(target.offsetHeight, 200)}px`;
+          }
+          target.querySelectorAll(':scope > .htmx-skeleton-stage').forEach((n) => n.remove());
+          target.classList.add('is-skeleton-loading');
+          target.setAttribute('aria-busy', 'true');
+          const stageEl = this._buildStage(target);
+          state.stageEl = stageEl;
+          target.appendChild(stageEl);
+        }, delay);
+      },
+      finish(evt) {
+        const xhr = evt?.detail?.xhr;
+        if (!xhr) return;
+        const state = this.active.get(xhr);
+        if (!state) return;
+        window.clearTimeout(state.timer);
+        this.active.delete(xhr);
+        const t = state.target;
+        if (t && this.targetXhr.get(t) === xhr) {
+          state.stageEl?.remove();
+          if (t.isConnected) {
+            t.style.minHeight = state.prevMinHeight;
+            t.classList.remove('is-skeleton-loading');
+            t.removeAttribute('aria-busy');
+          }
+          this.targetXhr.delete(t);
+        }
+      },
+      clearAll() {
+        document.querySelectorAll('.htmx-skeleton-stage').forEach((n) => n.remove());
+        document.querySelectorAll('.is-skeleton-loading').forEach((el) => {
+          el.classList.remove('is-skeleton-loading');
+          el.removeAttribute('aria-busy');
+          el.style.minHeight = '';
+        });
+      }
+    };
+    window.SkeletonStage = SkeletonStage;
+
+    // ================= 1.3. Oflayn Rejim va Tarmoq Tiklanish Oynasi =================
+    const OfflineGuard = {
+      toastTimer: null,
+      lastTrigger: null,
+      _overlay() {
+        return document.getElementById('offline-modal-overlay');
+      },
+      _pill() {
+        return document.getElementById('offline-mini-pill');
+      },
+      _toast() {
+        return document.getElementById('offline-toast-banner');
+      },
+      isOpen() {
+        const el = this._overlay();
+        return Boolean(el && !el.classList.contains('is-hidden'));
+      },
+      _setStatus(text, stateLabel, isOnline) {
+        const el = this._overlay();
+        if (!el) return;
+        const pill = el.querySelector('[data-offline-pill]');
+        const st = el.querySelector('[data-offline-status-text]');
+        const val = el.querySelector('[data-offline-state-val]');
+        if (pill) pill.classList.toggle('is-online', Boolean(isOnline));
+        if (st) st.textContent = text;
+        if (val) val.textContent = stateLabel;
+      },
+      show() {
+        const el = this._overlay();
+        if (!el) return;
+        if (!this.isOpen() && document.activeElement instanceof HTMLElement) {
+          this.lastTrigger = document.activeElement;
+        }
+        PageLoader.hide(true);
+        SkeletonStage.clearAll();
+        resetLoadingButtons();
+        this._toast()?.classList.add('is-hidden');
+        this._pill()?.classList.add('is-hidden');
+        this._setStatus('Internet aloqasi uzildi', 'Oflayn rejim', false);
+        el.classList.remove('is-hidden');
+        window.setTimeout(() => {
+          el.querySelector('[data-offline-retry]')?.focus?.();
+        }, 60);
+      },
+      minimize() {
+        const el = this._overlay();
+        if (el) el.classList.add('is-hidden');
+        if (!navigator.onLine) {
+          this._pill()?.classList.remove('is-hidden');
+        }
+        if (this.lastTrigger && document.contains(this.lastTrigger)) {
+          this.lastTrigger.focus();
+        }
+        this.lastTrigger = null;
+      },
+      handleOnline() {
+        const wasOpen = this.isOpen();
+        const wasOffline = wasOpen || !this._pill()?.classList.contains('is-hidden');
+        this._overlay()?.classList.add('is-hidden');
+        this._pill()?.classList.add('is-hidden');
+        if (wasOpen && this.lastTrigger && document.contains(this.lastTrigger)) {
+          this.lastTrigger.focus();
+        }
+        this.lastTrigger = null;
+        if (wasOffline) {
+          this.showOnlineToast();
+          window.dispatchEvent(new Event('focus'));
+        }
+      },
+      showOnlineToast() {
+        const toast = this._toast();
+        if (!toast) return;
+        window.clearTimeout(this.toastTimer);
+        toast.classList.remove('is-hidden');
+        this.toastTimer = window.setTimeout(() => {
+          toast.classList.add('is-hidden');
+        }, 4500);
+      },
+      async probeHealth(silent = false) {
+        const ctrl = new AbortController();
+        const tid = window.setTimeout(() => ctrl.abort(), 3500);
+        try {
+          const resp = await fetch('{% url "healthcheck" %}', {
+            cache: 'no-store',
+            credentials: 'same-origin',
+            signal: ctrl.signal,
+          });
+          window.clearTimeout(tid);
+          return resp.ok;
+        } catch (_err) {
+          window.clearTimeout(tid);
+          if (silent) this.show();
+          return false;
+        }
+      },
+      async checkNow() {
+        const el = this._overlay();
+        const btn = el?.querySelector('[data-offline-retry]');
+        const card = el?.querySelector('[data-offline-card]');
+        if (btn) {
+          btn.classList.add('is-probing');
+          btn.disabled = true;
+        }
+        this._setStatus('Aloqa tekshirilmoqda…', 'Tekshirilmoqda', false);
+        const ok = await this.probeHealth(false);
+        if (btn) {
+          btn.classList.remove('is-probing');
+          btn.disabled = false;
+        }
+        if (ok) {
+          this._setStatus('Aloqa tiklandi!', 'Onlayn', true);
+          window.setTimeout(() => this.handleOnline(), 280);
+          return;
+        }
+        this._setStatus("Hali ham tarmoq yo'q", 'Oflayn rejim', false);
+        if (card) {
+          card.classList.remove('is-shake');
+          void card.offsetWidth;
+          card.classList.add('is-shake');
+        }
+      },
+      onRequestError() {
+        if (!navigator.onLine) {
+          this.show();
+        } else {
+          this.probeHealth(true);
+        }
+      },
+      init() {
+        if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
+          navigator.serviceWorker.register('{% url "service_worker" %}', { scope: '/' }).catch(() => {});
+        }
+        window.addEventListener('offline', () => this.show());
+        window.addEventListener('online', () => this.handleOnline());
+        if (typeof navigator.onLine === 'boolean' && !navigator.onLine) {
+          this.show();
+        }
+      }
+    };
+    window.OfflineGuard = OfflineGuard;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => OfflineGuard.init());
+    } else {
+      OfflineGuard.init();
+    }
+
+    function boshlangichYuklanish() {
+      const yol = window.location.pathname || '';
+      if (yol.includes('/kirish')) {
+        PageLoader.hide(true);
+        return;
+      }
+      let yangiKirish = document.referrer && document.referrer.includes('/kirish');
+      try {
+        if (!sessionStorage.getItem('site_visited') || sessionStorage.getItem('just_logged_in') === '1') {
+          yangiKirish = true;
+        }
+        if (yangiKirish) {
+          sessionStorage.setItem('site_visited', '1');
+          sessionStorage.removeItem('just_logged_in');
+        }
+      } catch (_e) {}
+      if (yangiKirish) {
+        const muddat = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 120 : 320;
+        PageLoader.playFor(muddat);
+      } else {
+        PageLoader.hide(true);
+      }
+    }
+
+    function applyDynamicStyles(root) {
+      const scope = root && root.querySelectorAll ? root : document;
+      scope.querySelectorAll('[data-bg]').forEach((el) => {
+        el.style.background = el.getAttribute('data-bg');
+      });
+      if (document.body?.classList.contains('is-page-loading')) return;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      scope.querySelectorAll('[data-width]').forEach((el) => {
+        const w = Math.min(100, Math.max(0, Number(el.getAttribute('data-width')) || 0));
+        if (!reduced && !el.style.width) {
+          el.style.width = '0%';
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              el.style.width = w + '%';
+            });
+          });
+        } else {
+          el.style.width = w + '%';
+        }
+      });
+      animateCounters(scope);
+    }
+    window.applyDynamicStyles = applyDynamicStyles;
+
+    function animateCounters(root) {
+      if (document.body?.classList.contains('is-page-loading')) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        return;
+      }
+      const scope = root && root.querySelectorAll ? root : document;
+      const duration = 760;
+      scope.querySelectorAll('.stat .num, .analitika-metric-val').forEach((el) => {
+        if (el.dataset.counted === '1') return;
+        const raw = (el.textContent || '').trim();
+        const m = raw.match(/^(\d+)(%?)$/);
+        if (!m) return;
+        const target = Number(m[1]);
+        const suffix = m[2] || '';
+        el.dataset.counted = '1';
+        if (!Number.isFinite(target) || target <= 0) return;
+        const start = performance.now();
+        const step = (now) => {
+          const t = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - t, 3);
+          el.textContent = Math.round(target * eased) + suffix;
+          if (t < 1) {
+            requestAnimationFrame(step);
+          } else {
+            el.textContent = target + suffix;
+          }
+        };
+        el.textContent = '0' + suffix;
+        requestAnimationFrame(step);
+      });
+    }
+    window.animateCounters = animateCounters;
+
+    window.addEventListener('pageloader:hidden', () => {
+      applyDynamicStyles(document);
+      animateCounters(document);
+    });
+
+    // To'liq sahifaga o'tishda yuklash indikatorini ko'rsatish (native href saqlanadi)
+    document.addEventListener('click', (e) => {
+      if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      const a = e.target.closest('a[href]');
+      if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
+      if (
+        a.hasAttribute('hx-get')
+        || a.hasAttribute('hx-post')
+        || a.hasAttribute('hx-delete')
+        || a.hasAttribute('hx-patch')
+      ) {
+        return;
+      }
+      const href = a.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+      const yuklabOlish = /(\/(excel|zip|shakl1-docx|shakl1-zip|namuna|parollar|fayl|dastur)\/?|_excel|_zip|\.(xlsx|docx|pdf|zip))(\?|$)/i.test(href);
+      if (!yuklabOlish) {
+        PageLoader.show(3500, 180);
+      }
+    });
+
+    function resetLoadingButtons() {
+      document.querySelectorAll('.is-loading').forEach((b) => {
+        b.classList.remove('is-loading');
+        b.removeAttribute('aria-busy');
+        delete b.dataset.saving;
+      });
+      document.querySelectorAll('form[data-modal-confirmed="true"]').forEach((f) => {
+        delete f.dataset.modalConfirmed;
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        PageLoader.hide();
+        applyDynamicStyles(document);
+        animateCounters(document);
+      });
+    } else {
+      PageLoader.hide();
+      applyDynamicStyles(document);
+      animateCounters(document);
+    }
+
+    window.addEventListener('pageshow', (e) => {
+      PageLoader.hide(Boolean(e && e.persisted));
+      SkeletonStage.clearAll();
+      resetLoadingButtons();
+      applyDynamicStyles(document);
+      animateCounters(document);
+    });
+
+    let lastTableModalTrigger = null;
+
+    document.addEventListener('htmx:beforeRequest', (evt) => {
+      if (!document.querySelector('.table-modal-backdrop')) {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active !== document.body) {
+          lastTableModalTrigger = active;
+        } else if (evt.detail?.elt instanceof HTMLElement) {
+          lastTableModalTrigger = evt.detail.elt;
+        }
+      }
+      SkeletonStage.start(evt);
+    });
+
+    document.addEventListener('htmx:beforeSwap', (evt) => {
+      const target = evt.detail?.target;
+      if (!target) return;
+      const hadBackdrop = !!target.querySelector('.table-modal-backdrop');
+      const resp = evt.detail?.xhr?.responseText || '';
+      if (hadBackdrop && resp.includes('table-modal-backdrop')) {
+        target.dataset.modalRefresh = '1';
+      } else {
+        delete target.dataset.modalRefresh;
+      }
+    });
+    document.addEventListener('htmx:afterSwap', (evt) => {
+      PageLoader.hide();
+      const target = evt.detail?.target;
+      if (target?.dataset?.modalRefresh === '1') {
+        delete target.dataset.modalRefresh;
+        target.querySelectorAll('.table-modal-backdrop').forEach((el) => {
+          el.classList.add('is-panel-refresh');
+        });
+      } else {
+        const yangiDialog = target?.querySelector?.('.table-modal-backdrop .table-modal-dialog');
+        if (yangiDialog) {
+          setTimeout(() => {
+            const first = Array.from(
+              yangiDialog.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])')
+            ).find((el) => el.offsetParent !== null);
+            first?.focus?.();
+          }, 30);
+        } else if (
+          target &&
+          target.classList &&
+          !target.matches('body, .app, main, #kontent, [id$="-jonli"], [id$="-bolim"]') &&
+          !target.querySelector('.table-modal-backdrop')
+        ) {
+          target.classList.remove('is-htmx-updated');
+          void target.offsetWidth;
+          target.classList.add('is-htmx-updated');
+          window.setTimeout(() => target.classList.remove('is-htmx-updated'), 720);
+        }
+      }
+      applyDynamicStyles(document);
+      animateCounters(document);
+    });
+    document.addEventListener('jonli:yangilandi', (evt) => {
+      const target = (evt.detail && evt.detail.el) || (evt.target && evt.target !== document ? evt.target : null);
+      if (target && target.classList && !target.matches('body, .app, main, #kontent, [id$="-jonli"], [id$="-bolim"]')) {
+        target.classList.remove('is-jonli-updated');
+        void target.offsetWidth;
+        target.classList.add('is-jonli-updated');
+        window.setTimeout(() => target.classList.remove('is-jonli-updated'), 720);
+      }
+    });
+    document.addEventListener('htmx:afterSettle', () => {
+      applyDynamicStyles(document);
+      animateCounters(document);
+    });
+    document.addEventListener('htmx:afterRequest', (evt) => {
+      PageLoader.hide();
+      SkeletonStage.finish(evt);
+      resetLoadingButtons();
+    });
+    document.addEventListener('htmx:sendError', (evt) => {
+      PageLoader.hide();
+      SkeletonStage.finish(evt);
+      resetLoadingButtons();
+      OfflineGuard.onRequestError();
+    });
+    document.addEventListener('htmx:responseError', (evt) => {
+      PageLoader.hide();
+      SkeletonStage.finish(evt);
+      resetLoadingButtons();
+      const status = evt.detail?.xhr?.status;
+      const xabar = status === 403
+        ? "Ushbu amalni bajarishga ruxsat yo'q (403)."
+        : status === 429
+          ? "Juda ko'p so'rov yuborildi. Birozdan so'ng qayta urinib ko'ring."
+          : "Server bilan aloqa yoki ma'lumotni saqlashda xatolik yuz berdi.";
+      window.showAppToast?.(xabar, 'error');
+    });
+    document.addEventListener('htmx:abort', (evt) => {
+      SkeletonStage.finish(evt);
+    });
+
+    // ================= 1.5. Global Table & Action Modal Controller =================
+    const AppModal = {
+      activeForm: null,
+      lastTrigger: null,
+      closeTimer: null,
+      isOpen() {
+        const overlay = document.getElementById('app-global-modal');
+        return Boolean(
+          overlay &&
+          !overlay.classList.contains('is-hidden') &&
+          !overlay.classList.contains('is-closing')
+        );
+      },
+      open(opts) {
+        const overlay = document.getElementById('app-global-modal');
+        if (!overlay) return;
+        if (this.closeTimer) {
+          clearTimeout(this.closeTimer);
+          this.closeTimer = null;
+        }
+        if (overlay.classList.contains('is-hidden') || overlay.classList.contains('is-closing')) {
+          this.lastTrigger = opts.triggerEl || document.activeElement;
+        }
+        const card = overlay.querySelector('.app-modal-card');
+        const iconEl = document.getElementById('app-modal-icon');
+        const titleEl = document.getElementById('app-modal-title');
+        const subEl = document.getElementById('app-modal-subtitle');
+        const bodyEl = document.getElementById('app-modal-body');
+        const footerEl = document.getElementById('app-modal-footer');
+
+        card.classList.toggle('app-modal-wide', Boolean(opts.wide));
+        const mType = opts.type || 'primary';
+        iconEl.className = 'app-modal-icon ' + (mType === 'danger' ? 'danger' : mType === 'warning' ? 'warning' : mType === 'success' ? 'success' : '');
+        if (mType === 'danger') {
+          iconEl.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+        } else if (mType === 'warning') {
+          iconEl.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+        } else if (mType === 'success') {
+          iconEl.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+        } else {
+          iconEl.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>';
+        }
+
+        titleEl.textContent = opts.title || "Ma'lumot";
+        if (opts.subtitle) {
+          subEl.textContent = opts.subtitle;
+          subEl.style.display = 'block';
+        } else {
+          subEl.textContent = '';
+          subEl.style.display = 'none';
+        }
+
+        bodyEl.innerHTML = '';
+
+        if (opts.warnText) {
+          const alertBox = document.createElement('div');
+          alertBox.className = 'modal-alert-box ' + (opts.warnClass || 'warn');
+          alertBox.textContent = opts.warnText;
+          bodyEl.appendChild(alertBox);
+        }
+
+        if (opts.meta && opts.meta.length) {
+          const grid = document.createElement('div');
+          grid.className = 'modal-meta-grid';
+          opts.meta.forEach((m) => {
+            const box = document.createElement('div');
+            box.className = 'modal-meta-box';
+            const l = document.createElement('div');
+            l.className = 'modal-meta-lbl';
+            l.textContent = m.label;
+            const v = document.createElement('div');
+            v.className = 'modal-meta-val';
+            v.textContent = m.value;
+            box.appendChild(l);
+            box.appendChild(v);
+            grid.appendChild(box);
+          });
+          bodyEl.appendChild(grid);
+        }
+
+        if (opts.message) {
+          const p = document.createElement('p');
+          p.className = 'modal-message-text';
+          p.textContent = opts.message;
+          bodyEl.appendChild(p);
+        }
+
+        if (opts.rows && opts.rows.length) {
+          const list = document.createElement('div');
+          list.className = 'modal-detail-list';
+          opts.rows.forEach((r) => {
+            if (!r || (!r.value && r.value !== 0)) return;
+            const row = document.createElement('div');
+            row.className = 'modal-detail-row';
+            const k = document.createElement('span');
+            k.className = 'modal-detail-key';
+            k.textContent = r.label;
+            const v = document.createElement('span');
+            v.className = 'modal-detail-val';
+            v.textContent = String(r.value);
+            row.appendChild(k);
+            row.appendChild(v);
+            list.appendChild(row);
+          });
+          bodyEl.appendChild(list);
+        }
+
+        if (opts.promptLabel) {
+          const fieldWrap = document.createElement('div');
+          fieldWrap.className = 'modal-prompt-wrap';
+          const lbl = document.createElement('label');
+          lbl.className = 'modal-prompt-label';
+          lbl.setAttribute('for', 'app-modal-prompt-input');
+          lbl.textContent = opts.promptLabel;
+          const ta = document.createElement('textarea');
+          ta.id = 'app-modal-prompt-input';
+          ta.className = 'form-textarea';
+          ta.rows = 3;
+          ta.placeholder = opts.promptPlaceholder || 'Izoh kiriting...';
+          ta.value = opts.promptDefault || '';
+          const err = document.createElement('div');
+          err.id = 'app-modal-prompt-err';
+          err.className = 'modal-prompt-err';
+          err.style.display = 'none';
+          err.textContent = "Iltimos, bu maydonni to'ldiring.";
+          fieldWrap.appendChild(lbl);
+          fieldWrap.appendChild(ta);
+          fieldWrap.appendChild(err);
+          bodyEl.appendChild(fieldWrap);
+        }
+
+        footerEl.innerHTML = '';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'btn';
+        cancelBtn.textContent = opts.cancelText || 'Yopish';
+        cancelBtn.onclick = () => this.close();
+        footerEl.appendChild(cancelBtn);
+
+        if (opts.links && opts.links.length) {
+          opts.links.forEach((lnk) => {
+            if (!lnk || !lnk.url) return;
+            const a = document.createElement('a');
+            a.className = 'btn ' + (lnk.primary ? 'btn-primary' : '');
+            a.setAttribute('href', lnk.url);
+            a.textContent = lnk.label;
+            footerEl.appendChild(a);
+          });
+        }
+
+        let confirmBtn = null;
+        if (opts.onConfirm) {
+          confirmBtn = document.createElement('button');
+          confirmBtn.type = 'button';
+          confirmBtn.className = 'btn ' + (mType === 'danger' ? 'btn-danger' : mType === 'success' ? 'btn-success' : 'btn-primary');
+          confirmBtn.textContent = opts.confirmText || 'Tasdiqlash';
+          confirmBtn.onclick = () => {
+            if (opts.promptLabel) {
+              const ta = document.getElementById('app-modal-prompt-input');
+              const err = document.getElementById('app-modal-prompt-err');
+              const val = (ta ? ta.value : '').trim();
+              if (opts.promptRequired && !val) {
+                if (err) err.style.display = 'block';
+                if (ta) ta.focus();
+                return;
+              }
+              opts.onConfirm(val, confirmBtn);
+            } else {
+              opts.onConfirm('', confirmBtn);
+            }
+          };
+          footerEl.appendChild(confirmBtn);
+        }
+
+        overlay.classList.remove('is-closing', 'is-hidden');
+        card.style.animation = 'none';
+        void card.offsetWidth;
+        card.style.animation = '';
+        document.body.style.overflow = 'hidden';
+
+        setTimeout(() => {
+          const ta = document.getElementById('app-modal-prompt-input');
+          if (ta) ta.focus();
+          else if (confirmBtn) confirmBtn.focus();
+          else cancelBtn.focus();
+        }, 30);
+      },
+      _yakunlash() {
+        const overlay = document.getElementById('app-global-modal');
+        if (overlay) {
+          overlay.classList.add('is-hidden');
+          overlay.classList.remove('is-closing');
+        }
+        document.body.style.overflow = '';
+        this.activeForm = null;
+        if (this.lastTrigger && typeof this.lastTrigger.focus === 'function' && document.contains(this.lastTrigger)) {
+          this.lastTrigger.focus();
+        }
+        this.lastTrigger = null;
+        this.closeTimer = null;
+      },
+      close() {
+        const overlay = document.getElementById('app-global-modal');
+        if (!overlay || overlay.classList.contains('is-hidden') || overlay.classList.contains('is-closing')) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          this._yakunlash();
+          return;
+        }
+        overlay.classList.add('is-closing');
+        this.closeTimer = setTimeout(() => this._yakunlash(), 240);
+      }
+    };
+    window.AppModal = AppModal;
+
+    function _tableModalFokusiniTikla() {
+      if (!document.querySelector('.table-modal-backdrop') && lastTableModalTrigger) {
+        if (document.contains(lastTableModalTrigger)) {
+          lastTableModalTrigger.focus();
+        }
+        lastTableModalTrigger = null;
+      }
+    }
+
+    window.yopishTableModal = (target) => {
+      const el = typeof target === 'string' ? document.getElementById(target) : target;
+      if (!el) return;
+      const bd = el.classList.contains('table-modal-backdrop') ? el : el.querySelector('.table-modal-backdrop');
+      const box = bd ? bd.parentElement : el;
+      if (!bd || !box) {
+        if (el) el.innerHTML = '';
+        _tableModalFokusiniTikla();
+        return;
+      }
+      if (bd.classList.contains('is-closing')) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        box.innerHTML = '';
+        _tableModalFokusiniTikla();
+        return;
+      }
+      bd.classList.add('is-closing');
+      setTimeout(() => {
+        if (box.contains(bd)) box.innerHTML = '';
+        _tableModalFokusiniTikla();
+      }, 240);
+    };
+
+    function _onbModalOchiqmi() {
+      const onb = document.getElementById('korinish-sozlash-modal');
+      return Boolean(onb && window.getComputedStyle(onb).display !== 'none');
+    }
+
+    function _yuqoriModalHududi() {
+      if (OfflineGuard.isOpen()) {
+        return document.querySelector('#offline-modal-overlay .offline-modal-wrap');
+      }
+      if (_onbModalOchiqmi()) {
+        return document.querySelector('#korinish-sozlash-modal .onb-card');
+      }
+      if (AppModal.isOpen()) {
+        return document.querySelector('#app-global-modal .app-modal-card');
+      }
+      const backdrops = document.querySelectorAll('.table-modal-backdrop');
+      if (backdrops.length) {
+        const topBd = backdrops[backdrops.length - 1];
+        return topBd.querySelector('.table-modal-dialog') || topBd;
+      }
+      return null;
+    }
+
+    // Escape va Focus Trap boshqaruvi (ustma-ust modallarni z-index tartibi bilan boshqarish)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (OfflineGuard.isOpen()) {
+          e.preventDefault();
+          OfflineGuard.minimize();
+          return;
+        }
+        if (_onbModalOchiqmi()) {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('korinish:escape'));
+          return;
+        }
+        if (AppModal.isOpen()) {
+          e.preventDefault();
+          AppModal.close();
+          return;
+        }
+        if (document.querySelector('.popover-ochiq, .dropdown-ochiq')) {
+          return;
+        }
+        const backdrops = document.querySelectorAll('.table-modal-backdrop');
+        if (backdrops.length) {
+          e.preventDefault();
+          window.yopishTableModal(backdrops[backdrops.length - 1]);
+        }
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        const card = _yuqoriModalHududi();
+        if (!card) return;
+        const focusables = Array.from(
+          card.querySelectorAll('button:not([disabled]), a[href], textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')
+        ).filter((el) => el.offsetParent !== null || window.getComputedStyle(el).position === 'fixed');
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (!card.contains(document.activeElement)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first).focus();
+        } else if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+    // Intercept buttons with data-row-modal
+    document.addEventListener('click', (e) => {
+      const viewBtn = e.target.closest('[data-row-modal]');
+      if (viewBtn) {
+        window.dispatchEvent(new CustomEvent('action-menu:yopish'));
+        e.preventDefault();
+        e.stopPropagation();
+        const title = viewBtn.dataset.modalTitle || "Batafsil ma'lumot";
+        const subtitle = viewBtn.dataset.modalSubtitle || '';
+        const rawRows = viewBtn.dataset.rowModal || '';
+        const rows = rawRows.split('||').map((part) => {
+          const idx = part.indexOf('::');
+          if (idx === -1) return null;
+          return { label: part.slice(0, idx).trim(), value: part.slice(idx + 2).trim() };
+        }).filter(Boolean);
+        const links = [];
+        if (viewBtn.dataset.modalUrl) {
+          links.push({ url: viewBtn.dataset.modalUrl, label: viewBtn.dataset.modalUrlLabel || "Sahifani ochish", primary: true });
+        }
+        if (viewBtn.dataset.modalEditUrl) {
+          links.push({ url: viewBtn.dataset.modalEditUrl, label: viewBtn.dataset.modalEditLabel || "Tahrirlash", primary: !viewBtn.dataset.modalUrl });
+        }
+        AppModal.open({
+          triggerEl: viewBtn,
+          title,
+          subtitle,
+          rows,
+          links,
+          cancelText: 'Yopish'
+        });
+      }
+    }, true);
+
+    // Intercept form submissions with data-modal-confirm / data-modal-prompt (click + Enter)
+    document.addEventListener('submit', (e) => {
+      const form = e.target instanceof HTMLFormElement ? e.target : null;
+      if (!form || (!form.hasAttribute('data-modal-confirm') && !form.hasAttribute('data-modal-prompt'))) {
+        return;
+      }
+      if (form.dataset.modalConfirmed === 'true') {
+        delete form.dataset.modalConfirmed;
+        return;
+      }
+
+      window.dispatchEvent(new CustomEvent('action-menu:yopish'));
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      const submitter = e.submitter || document.activeElement;
+      const metaRaw = form.dataset.modalMeta || '';
+      const meta = metaRaw ? metaRaw.split('||').map((p) => {
+        const idx = p.indexOf('::');
+        return idx > -1 ? { label: p.slice(0, idx).trim(), value: p.slice(idx + 2).trim() } : null;
+      }).filter(Boolean) : [];
+
+      AppModal.open({
+        triggerEl: submitter instanceof HTMLElement ? submitter : null,
+        title: form.dataset.modalTitle || 'Amalni tasdiqlash',
+        subtitle: form.dataset.modalSubtitle || '',
+        message: form.dataset.modalConfirm || '',
+        type: form.dataset.modalType || 'primary',
+        warnText: form.dataset.modalWarn || '',
+        warnClass: form.dataset.modalWarnClass || 'warn',
+        meta,
+        promptLabel: form.dataset.modalPrompt || '',
+        promptPlaceholder: form.dataset.modalPlaceholder || 'Sabab yoki izohni kiriting...',
+        promptRequired: form.dataset.modalRequired === 'true',
+        cancelText: 'Bekor qilish',
+        confirmText: form.dataset.modalBtn || 'Tasdiqlash',
+        onConfirm(val, confirmBtn) {
+          const fieldName = form.dataset.modalField || 'izoh';
+          if (form.dataset.modalPrompt) {
+            let input = form.querySelector('[name="' + fieldName + '"]');
+            if (!input) {
+              input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = fieldName;
+              form.appendChild(input);
+            }
+            input.value = val;
+          }
+          form.dataset.modalConfirmed = 'true';
+          confirmBtn.classList.add('is-loading');
+          confirmBtn.setAttribute('aria-busy', 'true');
+          if (form.hasAttribute('hx-post') && window.htmx) {
+            AppModal.close();
+            window.htmx.trigger(form, 'submit');
+          } else {
+            delete form.dataset.modalConfirmed;
+            HTMLFormElement.prototype.submit.call(form);
+          }
+        }
+      });
+    }, true);
+
+    // ================= 2. Form Submit Loading Holati (Sun'iy 2s kutishsiz, real so'rov davomida) =================
+    document.addEventListener('submit', (e) => {
+      const form = e.target;
+      if (!form || (form.method || '').toLowerCase() !== 'post') return;
+      const submitter = e.submitter || form.querySelector('button[type="submit"], input[type="submit"]');
+      if (submitter && !submitter.classList.contains('logout-btn') && !submitter.classList.contains('menu-item')) {
+        submitter.classList.add('is-loading');
+        submitter.setAttribute('aria-busy', 'true');
+      }
+    });
+
+    // ================= 3. Tugma bosilganda mayin click-ripple animatsiyasi =================
+    document.addEventListener('pointerdown', (e) => {
+      if (
+        e.button > 0
+        || window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ) return;
+      const btn = e.target.closest('.btn, .chip-btn, .logout-btn, .btn-modal-view, .btn-dots, .teacher-chip, .app-modal-close, .seg-tab, .nav-link, .nav-pref-btn, .action-item, .menu-item, .nav-notif-item, .opt');
+      if (!btn || btn.disabled || btn.classList.contains('is-loading')) return;
+      btn.querySelectorAll('.btn-ripple').forEach((old) => old.remove());
+      const rect = btn.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const size = Math.max(rect.width, rect.height) * 2;
+      const wave = document.createElement('span');
+      wave.className = 'btn-ripple';
+      wave.style.width = size + 'px';
+      wave.style.height = size + 'px';
+      wave.style.left = (e.clientX - rect.left - size / 2) + 'px';
+      wave.style.top = (e.clientY - rect.top - size / 2) + 'px';
+      btn.appendChild(wave);
+      const tozalash = () => wave.remove();
+      wave.addEventListener('animationend', tozalash, { once: true });
+      setTimeout(tozalash, 650);
+    });
+
+    // ================= 4. O'zbekcha fayl tanlagich (.file-picker) holati =================
+    const yangilashFaylNomi = (input) => {
+      const wrap = input.closest('.file-picker');
+      const label = wrap && wrap.querySelector('.file-picker-name');
+      if (!wrap || !label) return;
+      const fayl = input.files && input.files[0];
+      label.textContent = fayl ? fayl.name : (label.dataset.empty || 'Fayl tanlanmagan');
+      wrap.classList.toggle('has-file', Boolean(fayl));
+    };
+
+    document.addEventListener('change', (e) => {
+      const input = e.target.closest('.file-picker input[type="file"]');
+      if (input) yangilashFaylNomi(input);
+    });
+
+    document.addEventListener('reset', (e) => {
+      const forma = e.target;
+      if (!forma || !forma.querySelectorAll) return;
+      setTimeout(() => forma.querySelectorAll('.file-picker input[type="file"]').forEach(yangilashFaylNomi), 0);
+    });
+  </script>
+  <script src="{% static 'web/js/alpine.min.js' %}" defer></script>
+  <script src="{% static 'web/js/jonli.js' %}?v=3" defer></script>
 </head>
-<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-{% if user.is_authenticated %}{% include "web/parts/_navbar.html" %}{% endif %}
-{% if debug_rejim and request.session.dev_asl_foydalanuvchi %}{% include "web/parts/_test_rejimi.html" %}{% endif %}
-<div class="app">
-  {% include "web/parts/_messages.html" %}
-  {% block content %}{% endblock %}
-</div>
+
+<body class="{% block body_class %}{% endblock %}{% if user.is_authenticated %} ui-font-{{ user.shrift_olchami }}{% if user.yuqori_kontrast %} ui-kontrast{% endif %}{% if user.keng_rejim %} ui-keng{% endif %}{% endif %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <!-- Asosiy markaziy minimalistik yuklanish indikatori (Center Page Loader) -->
+  <div id="htmx-yuklanish" class="htmx-top-bar htmx-indicator" aria-hidden="true"></div>
+  <div id="main-page-loader" class="page-loader-overlay is-hidden" role="status" aria-live="polite" aria-label="Yuklanmoqda">
+    <div class="page-loader-ghost" aria-hidden="true">
+      <div class="skeleton-topbar">
+        <div class="skeleton-bar sk-title sk-w-30"></div>
+        <div class="skeleton-bar sk-btn sk-w-18"></div>
+      </div>
+      {% include "web/parts/_skeleton_jadval.html" with show_stats=True show_toolbar=True wm_text="Sahifa yuklanmoqda…" %}
+    </div>
+    <div class="page-loader-spinner-wrap">
+      <div class="loader-emblem" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+      </div>
+      <div class="loader-title">O'quv yuklamasi</div>
+      <div class="loader-progress-track" aria-hidden="true">
+        <div class="loader-progress-fill"></div>
+      </div>
+    </div>
+  </div>
+  <template id="tpl-skeleton-watermark">{% include "web/parts/_skeleton_watermark.html" %}</template>
+  <script>boshlangichYuklanish();</script>
+  <div id="csrf-meta" data-csrf="{{ csrf_token }}" hidden></div>
+  {% if user.is_authenticated %}{% include "web/parts/_navbar.html" %}{% endif %}
+  {% if user.is_authenticated %}{% include "web/parts/_korinish_modal.html" %}{% endif %}
+  {% if debug_rejim and request.session.dev_asl_foydalanuvchi %}{% include "web/parts/_test_rejimi.html" %}{% endif %}
+  <div class="app">
+    <div id="app-messages" aria-live="polite">{% include "web/parts/_messages.html" %}</div>
+    {% block content %}{% endblock %}
+  </div>
+  <!-- Global Modal (Tasdiqlash, Sabab kiritish va Jadval qatori tafsilotlari uchun) -->
+  <div id="app-global-modal" class="app-modal-overlay is-hidden" onclick="if(event.target===this) AppModal.close()">
+    <div class="app-modal-card" role="dialog" aria-modal="true" aria-labelledby="app-modal-title">
+      <div class="app-modal-header">
+        <div class="app-modal-title-wrap">
+          <div id="app-modal-icon" class="app-modal-icon"></div>
+          <div>
+            <h3 id="app-modal-title" class="app-modal-title">Ma'lumot</h3>
+            <div id="app-modal-subtitle" class="app-modal-subtitle" style="display:none;"></div>
+          </div>
+        </div>
+        <button type="button" class="app-modal-close" onclick="AppModal.close()" aria-label="Yopish">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="app-modal-body" class="app-modal-body"></div>
+      <div id="app-modal-footer" class="app-modal-footer"></div>
+    </div>
+  </div>
+  <!-- Brendli Oflayn Oyna va Aloqa Holati Indikatori -->
+  <div id="offline-modal-overlay" class="app-modal-overlay offline-modal-overlay is-hidden print-hide" onclick="if(event.target===this) OfflineGuard.minimize()">
+    <div class="offline-modal-wrap" role="dialog" aria-modal="true" aria-labelledby="offline-modal-title">
+      {% include "web/parts/_offline_karta.html" with is_modal=True %}
+    </div>
+  </div>
+  <button type="button" id="offline-mini-pill" class="offline-mini-pill is-hidden print-hide" onclick="OfflineGuard.show()" aria-label="Oflayn holat tafsilotlari">
+    <span class="offline-mini-dot" aria-hidden="true"></span>
+    <span>Oflayn · Qayta ulash</span>
+  </button>
+  <div id="offline-toast-banner" class="offline-toast-banner is-hidden print-hide" role="status" aria-live="polite">
+    <span class="offline-toast-dot" aria-hidden="true"></span>
+    <span>Internet aloqasi tiklandi — ishlashda davom etishingiz mumkin</span>
+  </div>
 </body>
+
 </html>

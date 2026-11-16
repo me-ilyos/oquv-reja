@@ -1,0 +1,48 @@
+{% extends "web/base.html" %}
+{% block title %}Parol va bildirishnoma sozlamalari{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="title">Parolni o'zgartirish</div>
+  </div>
+</div>
+{% if user.parol_ozgartirish_kerak %}
+<div class="msg msg-warning" role="alert" style="margin-bottom:16px;">
+  Siz tizimga vaqtinchalik parol bilan kirdingiz. Doimiy yangi parol o'rnating.
+</div>
+{% endif %}
+<div class="parol-layout">
+<div class="card form-card">
+  <h2 class="parol-card-title">Parolni o'zgartirish</h2>
+  <p class="parol-card-desc">Xavfsizlik uchun hisobingiz parolini yangilang.</p>
+  <form method="post">
+    {% csrf_token %}
+    {% include "web/parts/_form_maydonlari.html" %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Parolni saqlash</button>
+      {% if not user.parol_ozgartirish_kerak %}
+      <a class="btn" href="{% url 'bosh_sahifa' %}">Bekor qilish</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<div class="card form-card">
+  <h2 class="parol-card-title">Telegram bildirishnomalar</h2>
+  <p class="parol-card-desc">
+    Dastur holati yoki yuklama tasdiqlanganda Telegram orqali ham xabar olish uchun Chat ID raqamingizni kiriting.
+  </p>
+  <form method="post" action="{% url 'profil_telegram_saqlash' %}" class="telegram-form">
+    {% csrf_token %}
+    <div class="telegram-form-field">
+      <label for="{{ telegram_form.telegram_chat_id.id_for_label }}">
+        {{ telegram_form.telegram_chat_id.label }}
+      </label>
+      {{ telegram_form.telegram_chat_id }}
+    </div>
+    <button type="submit" class="btn btn-primary">Saqlash</button>
+  </form>
+</div>
+</div>
+{% endblock %}
+

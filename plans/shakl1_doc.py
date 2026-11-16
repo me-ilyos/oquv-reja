@@ -1,0 +1,232 @@
+"""O'qituvchining 1-shakl shaxsiy yuklama rejasini Word (.docx) va .zip eksporti."""
+
+import re
+from collections import defaultdict
+from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
+
+from docx import Document
+from docx.enum.section import WD_ORIENT
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Cm, Pt
+from docx.table import Table, _Cell
+
+from accounts.models import Department, OqituvchiProfil
+from accounts.services import universitet_nomi
+from plans.models import Yuklama
+from plans.shakl1 import shakl1_satrlarini_yigish
+
+_SHAKL1_USTUNLAR = [
+    "№",
+    "Fan nomi",
+    "Yo'nalish",
+    "Kurs / Sem",
+    "Guruh / Oqim",
+    "Ma'ruza",
+    "Amaliyot",
+    "Lab.",
+    "Seminar",
+    "Kurs ishi",
+    "Jami",
+]
+
+
+def _xavfsiz_nom(matn: str) -> str:
+    toza = re.sub(r"[^A-Za-z0-9_-]+", "_", matn.strip()).strip("_")
+    return toza[:60] or "oqituvchi"
+
+
+def _sahifa_sozlash(doc: Document) -> None:
+    section = doc.sections[0]
+    section.orientation = WD_ORIENT.LANDSCAPE
+    section.page_width, section.page_height = section.page_height, section.page_width
+    for chet in ("top_margin", "bottom_margin", "left_margin", "right_margin"):
+        setattr(section, chet, Cm(1.4))
+
+
+def _sarlavha_yozish(
+    doc: Document,
+    profil: OqituvchiProfil,
+    akademik_yil: int,
+    jami_soat: int,
+    *,
+    uni_nomi: str | None = None,
+) -> None:
+    uni = uni_nomi or universitet_nomi("Oliy ta'lim muassasasi")
+    p_uni = doc.add_paragraph()
+    p_uni.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_uni = p_uni.add_run(uni.upper())
+    r_uni.bold = True
+    r_uni.font.size = Pt(11)
+
+    p_tit = doc.add_paragraph()
+    p_tit.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_tit = p_tit.add_run(
+        "1-SHAKL: O'QITUVCHINING SHAXSIY O'QUV YUKLAMASI "
+        f"({akademik_yil}/{akademik_yil + 1})"
+    )
+    r_tit.bold = True
+    r_tit.font.size = Pt(12)
+
+    kamomad = max(0, profil.turi.min_soat - jami_soat)
+    malumot = doc.add_paragraph()
+    r_info = malumot.add_run(
+        f"Kafedra: {profil.kafedra.nomi}   |   "
+        f"O'qituvchi: {profil}   |   "
+        f"Lavozim: {profil.turi.nomi} (norma: {profil.turi.min_soat} soat)   |   "
+        f"Jami yuklama: {jami_soat} soat"
+        + (f" (kamomad: {kamomad} soat)" if kamomad else "")
+    )
+    r_info.font.size = Pt(9.5)
+
+
+def _katakka_matn(katak: _Cell, matn: str, *, qalin: bool = False) -> None:
+    p = katak.paragraphs[0]
+    r = p.add_run(matn)
+    r.font.size = Pt(8.5)
+    r.bold = qalin
+
+
+_SOAT_KALITLARI = ("maruza", "amaliyot", "laboratoriya", "seminar", "kurs_ishi")
+
+
+def _shakl1_satr_qiymatlari(idx: int, q: dict[str, object]) -> list[str]:
+    return [
+        str(idx),
+        str(q["fan"]),
+        str(q["yonalish"]),
+        f"{q['kurs']}-kurs / {q['semestr']}-sem",
+        str(q["guruh"]),
+        *(str(q[k] or "—") for k in _SOAT_KALITLARI),
+        str(q["jami"]),
+    ]
+
+
+def _jadval_toldirish(
+    jadval: Table, satrlar: list[dict[str, object]], jami_soat: int
+) -> None:
+    for col_idx, nomi in enumerate(_SHAKL1_USTUNLAR):
+        _katakka_matn(jadval.rows[0].cells[col_idx], nomi, qalin=True)
+
+    if not satrlar:
+        bosh = jadval.add_row()
+        _katakka_matn(bosh.cells[1], "Ushbu o'quv yili uchun yuklama biriktirilmagan.")
+        return
+
+    yigindi = {k: 0 for k in _SOAT_KALITLARI}
+    for idx, q in enumerate(satrlar, start=1):
+        row = jadval.add_row().cells
+        for k in _SOAT_KALITLARI:
+            yigindi[k] += int(q.get(k, 0))
+        qiymatlar = _shakl1_satr_qiymatlari(idx, q)
+        for col_idx, qiymat in enumerate(qiymatlar):
+            _katakka_matn(row[col_idx], qiymat, qalin=(col_idx == len(qiymatlar) - 1))
+
+    yakun = jadval.add_row().cells
+    _katakka_matn(yakun[1], "JAMI:", qalin=True)
+    for offset, k in enumerate(_SOAT_KALITLARI, start=5):
+        _katakka_matn(yakun[offset], str(yigindi[k]), qalin=True)
+    _katakka_matn(yakun[10], str(jami_soat), qalin=True)
+
+
+def _shakl1_hujjat_yarat(
+    profil: OqituvchiProfil,
+    akademik_yil: int,
+    yuklamalar: list[Yuklama],
+    *,
+    uni_nomi: str | None = None,
+) -> BytesIO:
+    satrlar, _ = shakl1_satrlarini_yigish(yuklamalar)
+    jami_soat = sum(y.soat for y in yuklamalar)
+    doc = Document()
+    _sahifa_sozlash(doc)
+    _sarlavha_yozish(doc, profil, akademik_yil, jami_soat, uni_nomi=uni_nomi)
+
+    jadval = doc.add_table(rows=1, cols=len(_SHAKL1_USTUNLAR))
+    jadval.style = "Table Grid"
+    jadval.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _jadval_toldirish(jadval, satrlar, jami_soat)
+
+    imzo = doc.add_paragraph()
+    imzo.paragraph_format.space_before = Pt(12)
+    r_imzo = imzo.add_run(
+        "O'qituvchi: _____________________        "
+        "Kafedra mudiri: _____________________        "
+        "O'quv bo'limi: _____________________"
+    )
+    r_imzo.font.size = Pt(9.5)
+
+    buf = BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def shakl1_docx_render(profil: OqituvchiProfil, akademik_yil: int) -> BytesIO:
+    """Bitta o'qituvchining 1-shakl shaxsiy rejasini .docx qilib chiqaradi."""
+    yuklamalar = list(
+        Yuklama.objects.filter(oqituvchi=profil)
+        .akademik_yilda(akademik_yil)
+        .select_related("fan_semestr__variant__fan__reja", "guruh")
+        .order_by("fan_semestr__semestr", "fan_semestr__variant__nomi", "tur")
+    )
+    return _shakl1_hujjat_yarat(profil, akademik_yil, yuklamalar)
+
+
+def _shakl1_zip_yoz(
+    zf: ZipFile,
+    profillar: list[OqituvchiProfil],
+    akademik_yil: int,
+    yuk_xaritasi: dict[int, list[Yuklama]],
+) -> None:
+    if not profillar:
+        zf.writestr(
+            "README.txt",
+            (
+                f"{akademik_yil}/{akademik_yil + 1} o'quv yili uchun "
+                "faol o'qituvchilar topilmadi."
+            ),
+        )
+        return
+    uni_nomi = universitet_nomi("Oliy ta'lim muassasasi")
+    for p in profillar:
+        doc_buf = _shakl1_hujjat_yarat(
+            p, akademik_yil, yuk_xaritasi.get(p.pk, []), uni_nomi=uni_nomi
+        )
+        kaf_qism = _xavfsiz_nom(p.kafedra.nomi)
+        ism_qism = _xavfsiz_nom(
+            f"{p.foydalanuvchi.last_name}_{p.foydalanuvchi.first_name}"
+        )
+        zf.writestr(f"{kaf_qism}/{ism_qism}_{p.pk}_1shakl.docx", doc_buf.getvalue())
+
+
+def shakl1_zip_yarat(
+    akademik_yil: int, *, kafedra: Department | None = None
+) -> BytesIO:
+    """Faol o'qituvchilarning 1-shakl .docx fayllarini bitta .zip arxivga yig'adi."""
+    qs_prof = (
+        OqituvchiProfil.objects.filter(foydalanuvchi__is_active=True)
+        .toliq()
+        .order_by(
+            "kafedra__nomi", "foydalanuvchi__last_name", "foydalanuvchi__first_name"
+        )
+    )
+    qs_yuk = (
+        Yuklama.objects.akademik_yilda(akademik_yil)
+        .select_related("fan_semestr__variant__fan__reja", "guruh")
+        .order_by("fan_semestr__semestr", "fan_semestr__variant__nomi", "tur")
+    )
+    if kafedra is not None:
+        qs_prof = qs_prof.filter(kafedra=kafedra)
+        qs_yuk = qs_yuk.filter(oqituvchi__kafedra=kafedra)
+
+    yuk_xaritasi: dict[int, list[Yuklama]] = defaultdict(list)
+    for y in qs_yuk:
+        yuk_xaritasi[y.oqituvchi_id].append(y)
+
+    buf = BytesIO()
+    with ZipFile(buf, "w", compression=ZIP_DEFLATED) as zf:
+        _shakl1_zip_yoz(zf, list(qs_prof), akademik_yil, yuk_xaritasi)
+    buf.seek(0)
+    return buf

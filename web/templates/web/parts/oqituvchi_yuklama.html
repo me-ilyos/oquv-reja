@@ -1,0 +1,216 @@
+{% extends "web/base_print.html" %}
+{% load ui %}
+{% block title %}{{ profil }} — Yuklama varaqasi{% endblock %}
+{% block content %}
+<div x-data="{ tab: 'shakl1' }">
+<nav class="breadcrumb print-hide" aria-label="Breadcrumb">
+  <a href="{% url orqaga_url %}?yil={{ yil }}">O'qituvchilar</a>
+  <span class="sep">/</span>
+  <span class="current">{{ profil }}</span>
+</nav>
+<div class="topbar print-toolbar">
+  <div>
+    <div class="title topbar-title-flex">
+      <span>{{ profil }}</span>
+      <span class="badge-major">{{ profil.kafedra.nomi }}</span>
+    </div>
+    <div class="subtitle">
+      {{ profil.turi.nomi|capfirst }} · Minimal norma: {{ profil.turi.min_soat }} soat · {{ profil.foydalanuvchi.telefon }}
+    </div>
+  </div>
+  <div class="controls">
+    <a class="btn" href="{% url orqaga_url %}?yil={{ yil }}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Orqaga</span>
+    </a>
+    {% if docx_url %}
+    <a class="btn print-hide" href="{{ docx_url }}" hx-boost="false">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span>Word (1-shakl .docx)</span>
+    </a>
+    {% endif %}
+    <button type="button" class="btn btn-primary" onclick="window.print()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <span>Chop etish</span>
+    </button>
+  </div>
+</div>
+
+<div class="subtoolbar print-hide">
+  <div class="segmented-tabs" role="tablist" aria-label="Yuklama ko'rinishi">
+    <button type="button" role="tab" :aria-selected="tab === 'shakl1'" class="seg-tab" :class="tab === 'shakl1' && 'active'" @click="tab = 'shakl1'">1-shakl (Individual reja)</button>
+    <button type="button" role="tab" :aria-selected="tab === 'royxat'" class="seg-tab" :class="tab === 'royxat' && 'active'" @click="tab = 'royxat'">Batafsil ro'yxat</button>
+  </div>
+  {% if yillar %}
+  <form method="get">
+    <select name="yil" aria-label="O'quv yili" onchange="this.form.requestSubmit()">
+      {% for y in yillar %}
+      <option value="{{ y }}" {% if y == yil %}selected{% endif %}>{{ y }}/{{ y|add:1 }} o'quv yili</option>
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
+
+<div class="stats wide stats-compact print-hide" data-jonli="oqituvchi-yuklama-summary">
+  <div class="stat"><div class="num">{{ jami_soat }}</div><div class="lbl">Jami yuklama soat</div></div>
+  <div class="stat"><div class="num">{{ profil.turi.min_soat }}</div><div class="lbl">Minimal norma ({{ profil.turi.nomi|capfirst }})</div></div>
+  <div class="stat {% if kamomad %}warn{% else %}ok{% endif %}">
+    <div class="num">{{ jami_soat|foiz:profil.turi.min_soat }}%</div>
+    <div class="lbl">Qoplanish</div>
+  </div>
+  <div class="stat {% if kamomad %}warn{% else %}ok{% endif %}">
+    <div class="num">{{ kamomad }}</div>
+    <div class="lbl">Kamomad soat</div>
+  </div>
+</div>
+
+{% if tur_jami %}
+<div class="tur-taqsimot-bar print-hide">
+  {% for nomi, soat in tur_jami %}
+  <span class="tur-chip"><span class="tur-dot {% if 'Ma' in nomi %}tur-dot-maruza{% elif 'Amaliy' in nomi %}tur-dot-amaliyot{% elif 'Lab' in nomi %}tur-dot-lab{% elif 'Seminar' in nomi %}tur-dot-seminar{% elif 'Kurs' in nomi %}tur-dot-kurs{% endif %}"></span>{{ nomi }}: <strong>{{ soat }} soat</strong></span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="report-sheet">
+  <div class="letterhead">
+    <div class="letterhead-kicker" x-text="tab === 'shakl1' ? '1-SHAKL (O\'QUV YUKLAMASI)' : 'BATAFSIL YUKLAMA RO\'YXATI'">1-SHAKL (O'QUV YUKLAMASI)</div>
+    <h1>{{ profil }} — {{ yil }}/{{ yil|add:1 }} o'quv yili shaxsiy ish rejasi</h1>
+    <div class="sana">Kafedra: {{ profil.kafedra.nomi }} · Lavozim: {{ profil.turi.nomi|capfirst }} · Telefon: {{ profil.foydalanuvchi.telefon }} · Jami: {{ jami_soat }} / {{ profil.turi.min_soat }} soat</div>
+  </div>
+
+  {# 1-shakl: rasmiy ta'lim standarti jadvali #}
+  <div class="table-wrap cards table-shakl1" x-show="tab === 'shakl1'" x-cloak
+       x-transition:enter="anim-tab-enter" x-transition:enter-start="anim-tab-start" x-transition:enter-end="anim-tab-end">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-center" style="width:44px;">№</th>
+          <th>Fan nomi</th>
+          <th class="col-center col-yonalish">Yo'nalish</th>
+          <th class="col-center col-kurs">Kurs</th>
+          <th class="col-center col-sem">Sem.</th>
+          <th class="col-center">Guruh / Oqim</th>
+          <th class="col-center">Ma'ruza</th>
+          <th class="col-center">Amaliyot</th>
+          <th class="col-center">Lab.</th>
+          <th class="col-center">Seminar</th>
+          <th class="col-center">Kurs ishi</th>
+          <th class="col-center" style="width:90px;">Jami</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in shakl1_satrlar %}
+        <tr>
+          <td class="col-center col-idx-muted" data-label="№">{{ forloop.counter }}</td>
+          <td data-label="Fan">
+            <button type="button" class="reja-link reja-link-btn"
+                    data-modal-title="{{ s.fan }}"
+                    data-modal-subtitle="{{ s.kurs }}-kurs · {{ s.semestr }}-semestr · {{ s.guruh }}"
+                    data-row-modal="Fan nomi::{{ s.fan }}||Fan kodi::{{ s.kodi|default:'—' }}||Yo'nalish::{{ s.yonalish }}||Kurs va semestr::{{ s.kurs }}-kurs, {{ s.semestr }}-semestr||Guruh / Oqim::{{ s.guruh }}||Ma'ruza::{{ s.maruza }} soat||Amaliyot::{{ s.amaliyot }} soat||Laboratoriya::{{ s.laboratoriya }} soat||Seminar::{{ s.seminar }} soat||Kurs ishi::{{ s.kurs_ishi }} soat||Jami::{{ s.jami }} soat">
+              <strong>{{ s.fan }}</strong>
+            </button>
+          </td>
+          <td class="col-center" data-label="Yo'nalish"><span class="code">{{ s.yonalish }}</span></td>
+          <td class="col-center" data-label="Kurs"><span class="sem-pill">{{ s.kurs }}-kurs</span></td>
+          <td class="col-center" data-label="Semestr"><span class="sem-pill">{{ s.semestr }}-sem</span></td>
+          <td class="col-center" data-label="Guruh">{{ s.guruh }}</td>
+          <td class="col-center" data-label="Ma'ruza">{% if s.maruza %}<span class="shakl1-val">{{ s.maruza }}</span>{% else %}<span class="shakl1-dash">—</span>{% endif %}</td>
+          <td class="col-center" data-label="Amaliyot">{% if s.amaliyot %}<span class="shakl1-val">{{ s.amaliyot }}</span>{% else %}<span class="shakl1-dash">—</span>{% endif %}</td>
+          <td class="col-center" data-label="Laboratoriya">{% if s.laboratoriya %}<span class="shakl1-val">{{ s.laboratoriya }}</span>{% else %}<span class="shakl1-dash">—</span>{% endif %}</td>
+          <td class="col-center" data-label="Seminar">{% if s.seminar %}<span class="shakl1-val">{{ s.seminar }}</span>{% else %}<span class="shakl1-dash">—</span>{% endif %}</td>
+          <td class="col-center" data-label="Kurs ishi">{% if s.kurs_ishi %}<span class="shakl1-val">{{ s.kurs_ishi }}</span>{% else %}<span class="shakl1-dash">—</span>{% endif %}</td>
+          <td class="col-center" data-label="Jami"><span class="hour-tag ok table-total-hour">{{ s.jami }}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="12">
+          <div class="empty-state-rich">
+            <div class="empty-state-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/></svg>
+            </div>
+            <div class="empty-state-title">Bu o'quv yili uchun yuklama taqsimlanmagan</div>
+            <div class="empty-state-desc">Fanlar biriktirilgach, 1-shakl reja shu yerda chiqadi.</div>
+          </div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+      {% if shakl1_satrlar %}
+      <tfoot>
+        <tr>
+          <td colspan="11" class="table-total-label">Jami soat:</td>
+          <td class="col-center" data-label="Jami"><span class="hour-tag ok table-total-hour">{{ jami_soat }}</span></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+
+  {# Batafsil ro'yxat #}
+  <div class="table-wrap cards" x-show="tab === 'royxat'" x-cloak
+       x-transition:enter="anim-tab-enter" x-transition:enter-start="anim-tab-start" x-transition:enter-end="anim-tab-end">
+    <table data-jonli="oqituvchi-yuklama-jadval">
+      <thead>
+        <tr>
+          <th class="col-center" style="width:44px;">№</th>
+          <th>Fan</th>
+          <th class="col-center" style="width:140px;">Yo'nalish</th>
+          <th class="col-center" style="width:120px;">Semestr</th>
+          <th class="col-center" style="width:150px;">Mashg'ulot turi</th>
+          <th class="col-center">Guruh / Talabalar</th>
+          <th class="col-center" style="width:120px;">Soat</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for yuklama in yuklamalar %}
+        <tr>
+          <td class="col-center col-idx-muted" data-label="№">{{ forloop.counter }}</td>
+          <td data-label="Fan">
+            <span class="cell-val">
+              {% if yuklama.fan_semestr.variant.kodi %}<span class="code">{{ yuklama.fan_semestr.variant.kodi }}</span>{% endif %}
+              <strong>{{ yuklama.fan_semestr.variant.nomi }}</strong>
+            </span>
+          </td>
+          <td class="col-center" data-label="Yo'nalish"><span class="code">{{ yuklama.fan_semestr.variant.fan.reja.yonalish_kodi }}</span></td>
+          <td class="col-center" data-label="Semestr"><span class="sem-pill">{{ yuklama.fan_semestr.semestr }}-semestr</span></td>
+          <td class="col-center" data-label="Mashg'ulot turi">
+            <span class="tur-chip"><span class="tur-dot {% if yuklama.tur == 'MARUZA' %}tur-dot-maruza{% elif yuklama.tur == 'AMALIYOT' %}tur-dot-amaliyot{% elif yuklama.tur == 'LABORATORIYA' %}tur-dot-lab{% elif yuklama.tur == 'SEMINAR' %}tur-dot-seminar{% elif yuklama.tur == 'KURS_ISHI' %}tur-dot-kurs{% endif %}"></span>{{ yuklama.get_tur_display }}</span>
+          </td>
+          <td class="col-center" data-label="Guruh / Talabalar">
+            {% if yuklama.guruh %}<span class="code">{{ yuklama.guruh.nomi }}</span>
+            {% elif yuklama.talabalar_soni %}{{ yuklama.talabalar_soni }} talaba
+            {% else %}<span class="row-muted-text">Butun oqim</span>{% endif %}
+          </td>
+          <td class="col-center" data-label="Soat"><span class="hour-tag ok">{{ yuklama.soat }} soat</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7">
+          <div class="empty-state-rich">
+            <div class="empty-state-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/></svg>
+            </div>
+            <div class="empty-state-title">Bu o'quv yilida o'qituvchiga yuklama taqsimlanmagan</div>
+            <div class="empty-state-desc">Fan taqsimlashdan mashg'ulot biriktiring.</div>
+          </div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+      {% if yuklamalar %}
+      <tfoot>
+        <tr>
+          <td colspan="6" class="table-total-label">Jami:</td>
+          <td class="col-center" data-label="Jami"><span class="hour-tag ok table-total-hour">{{ jami_soat }} soat</span></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+
+  <div class="signatures">
+    <div class="line">O'qituvchi ({{ profil.foydalanuvchi.rasmiy_qisqa_ism }})</div>
+    <div class="line">Kafedra mudiri</div>
+    <div class="line">O'quv-uslubiy boshqarma</div>
+  </div>
+</div>
+</div>
+{% endblock %}
